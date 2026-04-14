@@ -34,10 +34,10 @@ type (
 		Name       string    `db:"name"        goqu:"omitempty"`
 		SchemaName string    `db:"schema_name" goqu:"skipinsert"`
 		State      string    `db:"state"       goqu:"omitempty"`
+		Status     string    `db:"status"      goqu:"omitempty"`
 		CreatedAt  time.Time `db:"created_at"  goqu:"omitempty"`
 		UpdatedAt  time.Time `db:"updated_at"  goqu:"omitempty"`
 		Metadata   []byte    `db:"metadata"`
-		IsDeleted  bool      `db:"is_deleted"  goqu:"skipinsert"`
 	}
 
 	UpdateTenantParams struct {

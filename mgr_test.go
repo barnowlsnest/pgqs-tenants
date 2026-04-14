@@ -17,6 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
+
 	pgqstenants "github.com/barnowlsnest/pgqs-tenants"
 )
 
