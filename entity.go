@@ -1,7 +1,6 @@
 package pgqstenants
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -51,12 +50,6 @@ type (
 		IsDisabled        bool `db:"is_disabled"`
 	}
 
-	TenantStatusPayload struct {
-		TenantSchema string    `json:"tenant_schema"`
-		State        string    `json:"state"`
-		ID           uuid.UUID `json:"tenant_id"`
-	}
-
 	TenantMetadata struct {
 		Engine string `json:"engine,omitempty"`
 	}
@@ -68,20 +61,6 @@ func PGQSTenantSchema(id uuid.UUID) string {
 
 func PGQSTenantsTable() string {
 	return fmt.Sprintf("%s.%s", PGQSSchema, TenantsTable)
-}
-
-func NotifyTenantStatusSQL(id uuid.UUID, status string) (string, error) {
-	payload := &TenantStatusPayload{
-		TenantSchema: PGQSTenantSchema(id),
-		State:        status,
-		ID:           id,
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("SELECT pg_notify('%s', '%s');", TenantsTable, string(data)), nil
 }
 
 func IsAnyOfStates(state State) bool {

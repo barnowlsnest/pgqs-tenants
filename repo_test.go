@@ -2,6 +2,7 @@ package pgqstenants
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -19,8 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
 )
 
 const (
@@ -80,6 +83,43 @@ func (s *TenantRepoTestSuite) TestCreate_Success() {
 	).Scan(&schemaExists)
 	s.Require().NoError(err)
 	s.True(schemaExists, "tenant schema should exist")
+}
+
+// Payload shape is defined in migrations/000004_tenant_notify_triggers.up.sql (notify_tenant_status_change).
+func (s *TenantRepoTestSuite) TestCreate_notifyTenantsChannel_singlePayloadFromTrigger() {
+	listener, err := harnesspg.NewListenerFromPool(s.ctx, s.pool, "tenants", 2)
+	s.Require().NoError(err)
+	defer listener.Stop(10 * time.Second)
+	s.Require().NoError(listener.Start(s.ctx))
+
+	name := "notify-" + uuid.New().String()
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: name, Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+
+	var payload struct {
+		ID     uuid.UUID `json:"id"`
+		Schema string    `json:"schema"`
+		Event  string    `json:"event"`
+	}
+	select {
+	case n := <-listener.Notifications():
+		s.Require().NotNil(n)
+		s.Equal("tenants", n.Channel)
+		s.Require().NoError(json.Unmarshal([]byte(n.Payload), &payload))
+	case <-time.After(15 * time.Second):
+		s.FailNow("timed out waiting for NOTIFY")
+	}
+
+	s.Equal(created.ID, payload.ID)
+	s.Equal(PGQSTenantSchema(created.ID), payload.Schema)
+	s.Equal("created", payload.Event)
+
+	select {
+	case n := <-listener.Notifications():
+		s.Fail("unexpected second NOTIFY: " + n.Payload)
+	case <-time.After(500 * time.Millisecond):
+	}
+	s.NoError(listener.Err())
 }
 
 func (s *TenantRepoTestSuite) TestCreate_NilTenant() {
@@ -473,11 +513,11 @@ func SetupTestContainer(t *testing.T) (pool *pgxpool.Pool, cleanup func()) {
 	skipIfDockerNotAvailable(t)
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx,
+	container, err := tcpostgres.Run(ctx,
 		"postgres:16-alpine",
-		postgres.WithDatabase(testDBName),
-		postgres.WithUsername(testDBUser),
-		postgres.WithPassword(testDBPass),
+		tcpostgres.WithDatabase(testDBName),
+		tcpostgres.WithUsername(testDBUser),
+		tcpostgres.WithPassword(testDBPass),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).

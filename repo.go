@@ -28,26 +28,6 @@ func NewTenantRepo(pool *postgres.DBPool) *TenantRepo {
 	return &TenantRepo{pool}
 }
 
-func (tr *TenantRepo) notifyTenantStatusWithTX(
-	ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, status string,
-) error {
-	if tx == nil {
-		return fmt.Errorf("nil transaction")
-	}
-
-	notifySQL, err := NotifyTenantStatusSQL(tenantID, status)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("TenantRepo.notifyTenantStatusWithTX", log.F("sql", notifySQL))
-	if _, err := tx.Exec(ctx, notifySQL); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, error) {
 	if tenant == nil {
 		return nil, ErrNilTenant
@@ -90,9 +70,6 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 
 	if errSchema := tr.createTenantSchemaWithTX(ctx, nTenant.ID, tx); errSchema != nil {
 		return nil, errSchema
-	}
-	if errNotify := tr.notifyTenantStatusWithTX(ctx, tx, nTenant.ID, nTenant.Status); errNotify != nil {
-		return nil, errNotify
 	}
 
 	if errTx := tx.Commit(ctx); errTx != nil {
@@ -218,9 +195,6 @@ func (tr *TenantRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	if update.RowsAffected() == 0 {
 		return fmt.Errorf("not a single row updated")
 	}
-	if errNotify := tr.notifyTenantStatusWithTX(ctx, tx, id, Disabled); errNotify != nil {
-		return errNotify
-	}
 
 	if errCommit := tx.Commit(ctx); errCommit != nil {
 		return errCommit
@@ -316,9 +290,6 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 
 	if _, errExec := tx.Exec(ctx, schemaSQL); errExec != nil {
 		return errExec
-	}
-	if errNotify := tr.notifyTenantStatusWithTX(ctx, tx, tenantID, Purged); errNotify != nil {
-		return errNotify
 	}
 
 	if errCommit := tx.Commit(ctx); errCommit != nil {
