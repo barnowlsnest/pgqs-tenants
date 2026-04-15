@@ -23,7 +23,12 @@ tasks:
     cmds:
       - go build .
 
-  test:
+  unit-tests:
     cmds:
       - go clean -testcache
-      - go test -v -race -timeout 10m ./...
+      - go test -v -race -timeout 5m ./...
+
+  integration-tests:
+    cmds:
+      - go clean -testcache
+      - go test -v -race -timeout 10m -tags integration ./...

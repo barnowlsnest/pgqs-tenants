@@ -1,4 +1,6 @@
-package pgqstenants
+//go:build integration
+
+package pgqs_tenants
 
 import (
 	"context"
@@ -76,7 +78,7 @@ func (s *TenantRepoTestSuite) TestCreate_Success() {
 
 	// Verify schema was created
 	var schemaExists bool
-	schemaName := PGQSTenantSchema(result.ID)
+	schemaName := TenantSchema(result.ID)
 	err = s.pool.QueryRow(s.ctx,
 		"SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)",
 		schemaName,
@@ -111,7 +113,7 @@ func (s *TenantRepoTestSuite) TestCreate_notifyTenantsChannel_singlePayloadFromT
 	}
 
 	s.Equal(created.ID, payload.ID)
-	s.Equal(PGQSTenantSchema(created.ID), payload.Schema)
+	s.Equal(TenantSchema(created.ID), payload.Schema)
 	s.Equal("created", payload.Event)
 
 	select {
@@ -183,7 +185,7 @@ func (s *TenantRepoTestSuite) TestCreate_SchemaNameGenerated() {
 	result, err := s.repo.Create(s.ctx, tenant)
 	s.Require().NoError(err)
 	s.NotEmpty(result.SchemaName)
-	s.Equal(PGQSTenantSchema(result.ID), result.SchemaName)
+	s.Equal(TenantSchema(result.ID), result.SchemaName)
 }
 
 func (s *TenantRepoTestSuite) TestGet_SchemaNamePresent() {
@@ -197,7 +199,7 @@ func (s *TenantRepoTestSuite) TestGet_SchemaNamePresent() {
 	result, err := s.repo.Get(s.ctx, created.ID)
 	s.Require().NoError(err)
 	s.Equal(created.SchemaName, result.SchemaName)
-	s.Equal(PGQSTenantSchema(created.ID), result.SchemaName)
+	s.Equal(TenantSchema(created.ID), result.SchemaName)
 }
 
 func (s *TenantRepoTestSuite) TestGetAll_SchemaNamePresent() {
@@ -215,7 +217,7 @@ func (s *TenantRepoTestSuite) TestGetAll_SchemaNamePresent() {
 	s.Len(results, 3)
 	for i := range results {
 		s.NotEmpty(results[i].SchemaName)
-		s.Equal(PGQSTenantSchema(results[i].ID), results[i].SchemaName)
+		s.Equal(TenantSchema(results[i].ID), results[i].SchemaName)
 	}
 }
 
@@ -384,7 +386,7 @@ func (s *TenantRepoTestSuite) TestGetTenantSchemaState_Up() {
 	s.Require().NoError(err)
 
 	// Non-controller tables in the tenant schema mean "up" for GetTenantSchemaState.
-	schemaName := PGQSTenantSchema(created.ID)
+	schemaName := TenantSchema(created.ID)
 	ensureTenantProbeTable(s.T(), s.ctx, s.pool, schemaName)
 
 	// tenants_state_check: move lifecycle state to ready (distinct from "status" column)
@@ -423,7 +425,7 @@ func (s *TenantRepoTestSuite) TestGetTenantSchemaState_Disabled() {
 	s.Require().NoError(err)
 
 	// Non-controller tables in the tenant schema mean "up" for GetTenantSchemaState.
-	schemaName := PGQSTenantSchema(created.ID)
+	schemaName := TenantSchema(created.ID)
 	ensureTenantProbeTable(s.T(), s.ctx, s.pool, schemaName)
 
 	_, err = s.pool.Exec(s.ctx,
@@ -447,7 +449,7 @@ func (s *TenantRepoTestSuite) TestGetTenantSchemaState_SchemaNotFound() {
 	s.Require().NoError(err)
 
 	// Drop the schema
-	schemaName := PGQSTenantSchema(created.ID)
+	schemaName := TenantSchema(created.ID)
 	_, err = s.pool.Exec(s.ctx, "DROP SCHEMA IF EXISTS \""+schemaName+"\" CASCADE")
 	s.Require().NoError(err)
 
@@ -474,7 +476,7 @@ func (s *TenantRepoTestSuite) TestDeleteTenantSchema_Success() {
 
 	// Verify schema is dropped
 	var schemaExists bool
-	schemaName := PGQSTenantSchema(created.ID)
+	schemaName := TenantSchema(created.ID)
 	err = s.pool.QueryRow(s.ctx,
 		"SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)",
 		schemaName,

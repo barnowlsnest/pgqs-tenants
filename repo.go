@@ -1,4 +1,4 @@
-package pgqstenants
+package pgqs_tenants
 
 import (
 	"context"
@@ -28,13 +28,15 @@ func NewTenantRepo(pool *postgres.DBPool) *TenantRepo {
 	return &TenantRepo{pool}
 }
 
+// Create inserts a new tenant record into the database and initializes its schema.
+// Returns the created tenant or an error.
 func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, error) {
 	if tenant == nil {
 		return nil, ErrNilTenant
 	}
 
 	tenant.State = "created"
-	tenantsTableName := PGQSTenantsTable()
+	tenantsTableName := TenantsTable()
 	tenantSQL, args, errSQL := postgres.SQL().
 		Insert(tenantsTableName).
 		Rows(tenant).
@@ -46,7 +48,7 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 					"state":      "created",
 					"updated_at": time.Now().UTC(),
 				},
-			).Where(goqu.T(TenantsTable).Col("status").Eq("disabled")),
+			).Where(goqu.T(TenantsTableName).Col("status").Eq("disabled")),
 		).
 		Returning(goqu.Star()).
 		Prepared(true).
@@ -79,6 +81,7 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 	return &nTenant, nil
 }
 
+// Update modifies a tenant record in the database using the provided parameters and returns the updated tenant or an error.
 func (tr *TenantRepo) Update(
 	ctx context.Context, id uuid.UUID, params *UpdateTenantParams,
 ) (*Tenant, error) {
@@ -90,7 +93,7 @@ func (tr *TenantRepo) Update(
 		record["metadata"] = metadata
 	}
 
-	tenantsTableName := PGQSTenantsTable()
+	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().Update(tenantsTableName).
 		Set(record).
 		Where(goqu.C("id").Eq(id.String())).
@@ -111,8 +114,10 @@ func (tr *TenantRepo) Update(
 	return &nTenant, nil
 }
 
+// Get retrieves a tenant record by its ID from the database.
+// Returns the tenant or an error if the operation fails.
 func (tr *TenantRepo) Get(ctx context.Context, id uuid.UUID) (*Tenant, error) {
-	tenantsTableName := PGQSTenantsTable()
+	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().
 		From(tenantsTableName).
 		Where(goqu.C("id").Eq(id.String())).
@@ -133,8 +138,9 @@ func (tr *TenantRepo) Get(ctx context.Context, id uuid.UUID) (*Tenant, error) {
 	return &nTenant, nil
 }
 
-func (tr *TenantRepo) GetAll(ctx context.Context) ([]Tenant, error) {
-	tenantsTableName := PGQSTenantsTable()
+// GetAll retrieves all tenant records from the database, ordered by status with disabled tenants listed last.
+func (tr *TenantRepo) GetAll(ctx context.Context) ([]*Tenant, error) {
+	tenantsTableName := TenantsTable()
 	sql, _, errSQL := postgres.SQL().
 		From(tenantsTableName).
 		Order(goqu.L("(status = 'disabled')").Desc()).
@@ -147,7 +153,7 @@ func (tr *TenantRepo) GetAll(ctx context.Context) ([]Tenant, error) {
 
 	log.Debug("TenantRepo.GetAll", log.F("sql", sql))
 
-	var tenants []Tenant
+	var tenants []*Tenant
 	if errQuery := pgxscan.Select(ctx, tr.pool, &tenants, sql); errQuery != nil {
 		return nil, errQuery
 	}
@@ -155,8 +161,9 @@ func (tr *TenantRepo) GetAll(ctx context.Context) ([]Tenant, error) {
 	return tenants, nil
 }
 
+// SoftDelete updates the tenant's status to "disabled" and updates the "updated_at" field for the given tenant ID.
 func (tr *TenantRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
-	tenantsTableName := PGQSTenantsTable()
+	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().
 		Update(tenantsTableName).
 		Set(
@@ -203,21 +210,10 @@ func (tr *TenantRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (tr *TenantRepo) createTenantSchemaWithTX(ctx context.Context, tenantID uuid.UUID, tx pgx.Tx) error {
-	schemaName := PGQSTenantSchema(tenantID)
-	schemaSQL := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q AUTHORIZATION CURRENT_USER;", schemaName)
-
-	log.Debug("TenantRepo.createTenantSchemaWithTX", log.F("sql", schemaSQL))
-
-	if _, errExec := tx.Exec(ctx, schemaSQL); errExec != nil {
-		return errExec
-	}
-
-	return nil
-}
-
+// GetTenantSchemaState retrieves the current state of the tenant's schema based on its existence, tables, and status.
+// Possible states returned: "Up", "Down", "Disabled". Returns an error if the database query fails.
 func (tr *TenantRepo) GetTenantSchemaState(ctx context.Context, tenantID uuid.UUID) (string, error) {
-	schemaName := PGQSTenantSchema(tenantID)
+	schemaName := TenantSchema(tenantID)
 	schemaExistsSQL := `
         SELECT
             EXISTS(
@@ -254,6 +250,7 @@ func (tr *TenantRepo) GetTenantSchemaState(ctx context.Context, tenantID uuid.UU
 	return Up, nil
 }
 
+// DeleteTenantSchema removes the database schema and tenant record associated with the given tenant ID.
 func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID) error {
 	tx, errTx := tr.pool.Begin(ctx)
 	if errTx != nil {
@@ -262,7 +259,7 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	tenantsTableName := PGQSTenantsTable()
+	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().Delete(tenantsTableName).
 		Where(goqu.C("id").Eq(tenantID.String())).
 		Prepared(true).
@@ -283,7 +280,7 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 		return fmt.Errorf("tenant not found: %s", tenantID.String())
 	}
 
-	schemaName := PGQSTenantSchema(tenantID)
+	schemaName := TenantSchema(tenantID)
 	schemaSQL := fmt.Sprintf("DROP SCHEMA IF EXISTS %q CASCADE;", schemaName)
 
 	log.Debug("TenantRepo.DeleteTenantSchema.TX", log.F("sql", schemaSQL))
@@ -294,6 +291,19 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 
 	if errCommit := tx.Commit(ctx); errCommit != nil {
 		return errCommit
+	}
+
+	return nil
+}
+
+func (tr *TenantRepo) createTenantSchemaWithTX(ctx context.Context, tenantID uuid.UUID, tx pgx.Tx) error {
+	schemaName := TenantSchema(tenantID)
+	schemaSQL := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q AUTHORIZATION CURRENT_USER;", schemaName)
+
+	log.Debug("TenantRepo.createTenantSchemaWithTX", log.F("sql", schemaSQL))
+
+	if _, errExec := tx.Exec(ctx, schemaSQL); errExec != nil {
+		return errExec
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package pgqstenants
+package pgqs_tenants
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	TenantsTable              = "tenants"
+	TenantsTableName          = "tenants"
 	PGQSSchema                = "pgqs"
 	PGQSTenantSchemaPrefix    = PGQSSchema + "_tenant"
 	PGQSTenantSchemaSeparator = "_"
@@ -23,7 +23,7 @@ const (
 	Purged   State = "purged"
 )
 
-var ControlPlaneStates = []State{Created, Up, Down, Disabled, Purged}
+var States = []State{Created, Up, Down, Disabled, Purged}
 
 type (
 	State = string
@@ -55,14 +55,14 @@ type (
 	}
 )
 
-func PGQSTenantSchema(id uuid.UUID) string {
+func TenantSchema(id uuid.UUID) string {
 	return PGQSTenantSchemaPrefix + PGQSTenantSchemaSeparator + id.String()
 }
 
-func PGQSTenantsTable() string {
-	return fmt.Sprintf("%s.%s", PGQSSchema, TenantsTable)
+func TenantsTable() string {
+	return fmt.Sprintf("%s.%s", PGQSSchema, TenantsTableName)
 }
 
 func IsAnyOfStates(state State) bool {
-	return slices.Contains(ControlPlaneStates, state)
+	return slices.Contains(States, state)
 }

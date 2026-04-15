@@ -1,4 +1,4 @@
-package pgqstenants
+package pgqs_tenants
 
 import (
 	"embed"
@@ -48,7 +48,7 @@ func newTenantMigration(dbURL string, tenantID uuid.UUID) (*migrate.Migrate, err
 		return nil, err
 	}
 	q := u.Query()
-	q.Set("search_path", PGQSTenantSchema(tenantID))
+	q.Set("search_path", TenantSchema(tenantID))
 	u.RawQuery = q.Encode()
 
 	return migrate.NewWithSourceInstance("iofs", src, u.String())
