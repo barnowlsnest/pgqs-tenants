@@ -1,6 +1,6 @@
 //go:build integration
 
-package pgqs_tenants
+package pgqstenant
 
 import (
 	"context"

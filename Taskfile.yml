@@ -24,15 +24,11 @@ tasks:
       - go build .
 
   unit-tests:
-    env:
-      GOPRIVATE: github.com/barnowlsnest/*
     cmds:
       - go clean -testcache
       - go test -v -race -timeout 5m ./...
 
   integration-tests:
-    env:
-      GOPRIVATE: github.com/barnowlsnest/*
     cmds:
       - go clean -testcache
       - go test -v -race -timeout 10m -tags integration ./...
