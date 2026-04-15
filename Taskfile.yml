@@ -4,6 +4,7 @@ version: '3'
 
 env:
   MODULE_PATH: github.com/barnowlsnest/pgqs-tenants
+  GOPRIVATE: github.com/barnowlsnest/*
 
 tasks:
   update:
