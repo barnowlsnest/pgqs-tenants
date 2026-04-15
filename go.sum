@@ -14,8 +14,8 @@ github.com/barnowlsnest/go-configlib/v2 v2.0.0 h1:/iEdDiib57euVdNK01GSQBa/Ly2tmd
 github.com/barnowlsnest/go-configlib/v2 v2.0.0/go.mod h1:QNwtyrHCDGHK/kRVxZDJ8YYMJ0rFfc460X+YosvDCSI=
 github.com/barnowlsnest/go-logslib/v2 v2.0.0 h1:jecd1aQgyIBjIBcH+L7qOBeS5prtSCHMHaklPe7P2d0=
 github.com/barnowlsnest/go-logslib/v2 v2.0.0/go.mod h1:N/GMGArt46ywtKx4n3HIqa+SRmchq9szprG/6+EMKDg=
-github.com/barnowlsnest/pgqs-harness v1.1.0 h1:E+ABrAMTXfzqJU71/s3B8zOve7Dg8IMy9VDuUqHbJpg=
-github.com/barnowlsnest/pgqs-harness v1.1.0/go.mod h1:Zme6TZTK8IMmu/ZJpvUbSmsiWD1uVrbWRptignPxrFs=
+github.com/barnowlsnest/pgqs-harness v1.2.0 h1:2aO8D9vDKiVjaC1m/r/Cx5jQVHyKIX3svJ66smrND8Y=
+github.com/barnowlsnest/pgqs-harness v1.2.0/go.mod h1:Zme6TZTK8IMmu/ZJpvUbSmsiWD1uVrbWRptignPxrFs=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

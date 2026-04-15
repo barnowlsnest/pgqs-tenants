@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/barnowlsnest/go-logslib/v2 v2.0.0
-	github.com/barnowlsnest/pgqs-harness v1.1.0
+	github.com/barnowlsnest/pgqs-harness v1.2.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/golang-migrate/migrate/v4 v4.19.1
