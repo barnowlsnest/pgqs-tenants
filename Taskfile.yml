@@ -4,7 +4,6 @@ version: '3'
 
 env:
   MODULE_PATH: github.com/barnowlsnest/pgqs-tenants
-  GOPRIVATE: github.com/barnowlsnest/*
 
 tasks:
   update:
@@ -25,11 +24,15 @@ tasks:
       - go build .
 
   unit-tests:
+    env:
+      GOPRIVATE: github.com/barnowlsnest/*
     cmds:
       - go clean -testcache
       - go test -v -race -timeout 5m ./...
 
   integration-tests:
+    env:
+      GOPRIVATE: github.com/barnowlsnest/*
     cmds:
       - go clean -testcache
       - go test -v -race -timeout 10m -tags integration ./...
