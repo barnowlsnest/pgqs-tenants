@@ -2,7 +2,7 @@ package pgqstenant
 
 import (
 	"time"
-	
+
 	"github.com/google/uuid"
 )
 
@@ -42,7 +42,7 @@ func (m *Model) newCopy() *Model {
 	if m == nil {
 		return &model
 	}
-	
+
 	model.ID = m.ID
 	model.Name = m.Name
 	model.SchemaName = m.SchemaName
@@ -53,6 +53,6 @@ func (m *Model) newCopy() *Model {
 	model.Metadata = m.Metadata
 	model.SchemaTablesCount = m.SchemaTablesCount
 	model.SchemaExists = m.SchemaExists
-	
+
 	return &model
 }
