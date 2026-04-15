@@ -1,4 +1,4 @@
-package pgqs_tenants
+package pgqstenant
 
 import (
 	"embed"

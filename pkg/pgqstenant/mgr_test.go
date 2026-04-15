@@ -1,6 +1,6 @@
 //go:build integration
 
-package pgqs_tenants_test
+package pgqstenant
 
 import (
 	"context"
@@ -19,8 +19,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
-
-	pgqstenants "github.com/barnowlsnest/pgqs-tenants"
 )
 
 type MgrSuite struct {
@@ -83,7 +81,7 @@ func (s *MgrSuite) TestMigrateUpThenDown() {
 
 	s.createTenantSchema(db, tenantID)
 
-	s.Require().NoError(pgqstenants.MigrateUP(s.dbURL, tenantID))
+	s.Require().NoError(MigrateUP(s.dbURL, tenantID))
 
 	var tenantsExists bool
 	err := db.QueryRowContext(s.ctx, `
@@ -104,7 +102,7 @@ func (s *MgrSuite) TestMigrateUpThenDown() {
 	s.True(statusExists)
 
 	for {
-		err := pgqstenants.MigrateDOWN(s.dbURL, tenantID)
+		err := MigrateDOWN(s.dbURL, tenantID)
 		if errors.Is(err, migrate.ErrNoChange) {
 			break
 		}
@@ -133,10 +131,10 @@ func (s *MgrSuite) TestTenantTriggers_notifyViaHarnessListener() {
 	defer func() { s.Require().NoError(db.Close()) }()
 
 	s.createTenantSchema(db, tenantID)
-	s.Require().NoError(pgqstenants.MigrateUP(s.dbURL, tenantID))
+	s.Require().NoError(MigrateUP(s.dbURL, tenantID))
 	defer func() {
 		for {
-			err := pgqstenants.MigrateDOWN(s.dbURL, tenantID)
+			err := MigrateDOWN(s.dbURL, tenantID)
 			if errors.Is(err, migrate.ErrNoChange) {
 				return
 			}
