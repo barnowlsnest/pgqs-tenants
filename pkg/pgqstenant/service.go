@@ -163,58 +163,6 @@ func (s *Service) Down(tenantModel *Model) error {
 	return MigrateDOWN(s.dbURL, m.ID)
 }
 
-// SetTenantControlPlaneState updates the state of a tenant and performs the corresponding operation.
-func (s *Service) SetTenantControlPlaneState(ctx context.Context, tenantModel *Model) error {
-	if tenantModel == nil {
-		return errors.New("tenant model cannot be nil")
-	}
-
-	switch tenantModel.ControlState {
-	case Up:
-		if errRollout := s.Up(tenantModel); errRollout != nil {
-			return errRollout
-		}
-	case Down:
-		if errRollback := s.Down(tenantModel); errRollback != nil {
-			return errRollback
-		}
-	case Disabled:
-		if errSoftDel := s.DisableTenant(ctx, tenantModel); errSoftDel != nil {
-			return errSoftDel
-		}
-	case Purged:
-		if errPurge := s.PurgeTenant(ctx, tenantModel); errPurge != nil {
-			return errPurge
-		}
-	default:
-		return errors.Join(
-			ErrUnknownState,
-			fmt.Errorf("invalid control state: %s", tenantModel.ControlState),
-		)
-	}
-
-	return nil
-}
-
-// GetTenantControlPlaneState retrieves the state of a tenant and updates it in the tenant model or returns an error.
-func (s *Service) GetTenantControlPlaneState(ctx context.Context, tenantModel *Model) (*Model, error) {
-	m := tenantModel.newCopy()
-	schemaState, errState := s.repo.GetTenantSchemaState(ctx, m.ID)
-	if errState != nil {
-		log.Error(errState)
-		return nil, errState
-	}
-
-	if !IsAnyOfStates(schemaState) {
-		log.Error(fmt.Errorf("unknown state: %s", schemaState))
-		return nil, ErrUnknownState
-	}
-
-	m.ControlState = schemaState
-
-	return m, nil
-}
-
 func (s *Service) validate() error {
 	switch {
 	case s.dbURL == "":
