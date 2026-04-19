@@ -43,7 +43,7 @@ type TenantRepoTestSuite struct {
 func (s *TenantRepoTestSuite) SetupSuite() {
 	s.pool, s.cleanup = SetupTestContainer(s.T())
 	RunControllerMigrations(s.T(), s.pool)
-	s.repo = NewTenantRepo(s.pool)
+	s.repo = NewRepo(s.pool)
 	s.ctx = context.Background()
 }
 
@@ -70,8 +70,6 @@ func (s *TenantRepoTestSuite) TestCreate_Success() {
 	s.Require().NoError(err)
 	s.NotEqual(uuid.Nil, result.ID)
 	s.Equal("test-tenant", result.Name)
-	// tenants_state_check: state IN ('created', 'ready', 'disabled')
-	s.Equal("created", result.State)
 	s.Equal("created", result.Status)
 
 	// Verify schema was created
@@ -155,9 +153,8 @@ func (s *TenantRepoTestSuite) TestCreate_ReactivateSoftDeleted() {
 	created, err := s.repo.Create(s.ctx, tenant)
 	s.Require().NoError(err)
 
-	// Align with tenants_state_check (state) and repo ON CONFLICT (status = 'disabled').
 	_, err = s.pool.Exec(s.ctx,
-		"UPDATE pgqs.tenants SET state = 'disabled', status = 'disabled' WHERE id = $1",
+		"UPDATE pgqs.tenants SET status = 'disabled' WHERE id = $1",
 		created.ID,
 	)
 	s.Require().NoError(err)
@@ -170,7 +167,6 @@ func (s *TenantRepoTestSuite) TestCreate_ReactivateSoftDeleted() {
 	reactivated, err := s.repo.Create(s.ctx, tenant2)
 	s.Require().NoError(err)
 	s.Equal(created.ID, reactivated.ID)
-	s.Equal("created", reactivated.State)
 	s.Equal("created", reactivated.Status)
 }
 
@@ -229,7 +225,7 @@ func (s *TenantRepoTestSuite) TestCreate_ReactivatedSchemaNamePreserved() {
 	originalSchemaName := created.SchemaName
 
 	_, err = s.pool.Exec(s.ctx,
-		"UPDATE pgqs.tenants SET state = 'disabled', status = 'disabled' WHERE id = $1",
+		"UPDATE pgqs.tenants SET status = 'disabled' WHERE id = $1",
 		created.ID,
 	)
 	s.Require().NoError(err)
@@ -258,7 +254,6 @@ func (s *TenantRepoTestSuite) TestGet_Success() {
 	s.Require().NoError(err)
 	s.Equal(created.ID, result.ID)
 	s.Equal("get-tenant", result.Name)
-	s.Equal("created", result.State)
 	s.Equal("created", result.Status)
 }
 
@@ -291,9 +286,7 @@ func (s *TenantRepoTestSuite) TestGetAll_Empty() {
 	s.Empty(result)
 }
 
-func (s *TenantRepoTestSuite) TestUpdate_StatusParam_setsStatusColumnNotState() {
-	// TenantRepo.Update writes UpdateTenantParams.Status to the DB "status" column (post-000004),
-	// not the "state" column governed by tenants_state_check.
+func (s *TenantRepoTestSuite) TestUpdate_StatusOnly() {
 	tenant := &Tenant{
 		Name:     "status-tenant",
 		Metadata: []byte(`{}`),
@@ -305,27 +298,6 @@ func (s *TenantRepoTestSuite) TestUpdate_StatusParam_setsStatusColumnNotState() 
 	updated, err := s.repo.Update(s.ctx, created.ID, params)
 	s.Require().NoError(err)
 	s.Equal("ready", updated.Status)
-	s.Equal("created", updated.State, "state unchanged unless repo sets it")
-}
-
-func (s *TenantRepoTestSuite) TestStateColumn_tenantsStateCheck_ready() {
-	tenant := &Tenant{
-		Name:     "state-ready-tenant",
-		Metadata: []byte(`{}`),
-	}
-	created, err := s.repo.Create(s.ctx, tenant)
-	s.Require().NoError(err)
-
-	_, err = s.pool.Exec(s.ctx,
-		"UPDATE pgqs.tenants SET state = 'ready' WHERE id = $1",
-		created.ID,
-	)
-	s.Require().NoError(err)
-
-	got, err := s.repo.Get(s.ctx, created.ID)
-	s.Require().NoError(err)
-	s.Equal("ready", got.State)
-	s.Equal("created", got.Status)
 }
 
 func (s *TenantRepoTestSuite) TestUpdate_Metadata() {
@@ -363,8 +335,6 @@ func (s *TenantRepoTestSuite) TestSoftDelete_Success() {
 	result, err := s.repo.Get(s.ctx, created.ID)
 	s.Require().NoError(err)
 	s.Equal("disabled", result.Status)
-	// tenants_state_check still allows current state value
-	s.Contains([]string{"created", "ready", "disabled"}, result.State)
 }
 
 func (s *TenantRepoTestSuite) TestSoftDelete_NotFound() {
@@ -374,85 +344,53 @@ func (s *TenantRepoTestSuite) TestSoftDelete_NotFound() {
 	s.Contains(err.Error(), "not a single row updated")
 }
 
-func (s *TenantRepoTestSuite) TestGetTenantSchemaState_Up() {
-	// Create a tenant (schema is created automatically)
+func (s *TenantRepoTestSuite) TestGetSchemaInfo_ExistsNotMigrated() {
 	tenant := &Tenant{
-		Name:     "schema-state-tenant",
+		Name:     "schema-exists-no-tables",
 		Metadata: []byte(`{}`),
 	}
 	created, err := s.repo.Create(s.ctx, tenant)
 	s.Require().NoError(err)
 
-	// Non-controller tables in the tenant schema mean "up" for GetTenantSchemaState.
+	info, err := s.repo.GetSchemaInfo(s.ctx, created.ID)
+	s.Require().NoError(err)
+	s.True(info.Exists)
+	s.False(info.Migrated)
+}
+
+func (s *TenantRepoTestSuite) TestGetSchemaInfo_ExistsAndMigrated() {
+	tenant := &Tenant{
+		Name:     "schema-exists-with-tables",
+		Metadata: []byte(`{}`),
+	}
+	created, err := s.repo.Create(s.ctx, tenant)
+	s.Require().NoError(err)
+
 	schemaName := TenantSchema(created.ID)
 	ensureTenantProbeTable(s.T(), s.ctx, s.pool, schemaName)
 
-	// tenants_state_check: move lifecycle state to ready (distinct from "status" column)
-	_, err = s.pool.Exec(s.ctx,
-		"UPDATE pgqs.tenants SET state = 'ready' WHERE id = $1",
-		created.ID,
-	)
+	info, err := s.repo.GetSchemaInfo(s.ctx, created.ID)
 	s.Require().NoError(err)
-
-	state, err := s.repo.GetTenantSchemaState(s.ctx, created.ID)
-	s.Require().NoError(err)
-	s.Equal("up", state)
+	s.True(info.Exists)
+	s.True(info.Migrated)
 }
 
-func (s *TenantRepoTestSuite) TestGetTenantSchemaState_Down() {
-	// Create a tenant (schema is created but no tables)
+func (s *TenantRepoTestSuite) TestGetSchemaInfo_SchemaDoesNotExist() {
 	tenant := &Tenant{
-		Name:     "schema-down-tenant",
+		Name:     "schema-dropped",
 		Metadata: []byte(`{}`),
 	}
 	created, err := s.repo.Create(s.ctx, tenant)
 	s.Require().NoError(err)
 
-	state, err := s.repo.GetTenantSchemaState(s.ctx, created.ID)
-	s.Require().NoError(err)
-	s.Equal("down", state)
-}
-
-func (s *TenantRepoTestSuite) TestGetTenantSchemaState_Disabled() {
-	// Create a tenant with tables and mark as disabled
-	tenant := &Tenant{
-		Name:     "schema-disabled-tenant",
-		Metadata: []byte(`{}`),
-	}
-	created, err := s.repo.Create(s.ctx, tenant)
-	s.Require().NoError(err)
-
-	// Non-controller tables in the tenant schema mean "up" for GetTenantSchemaState.
-	schemaName := TenantSchema(created.ID)
-	ensureTenantProbeTable(s.T(), s.ctx, s.pool, schemaName)
-
-	_, err = s.pool.Exec(s.ctx,
-		"UPDATE pgqs.tenants SET state = 'disabled', status = 'disabled' WHERE id = $1",
-		created.ID,
-	)
-	s.Require().NoError(err)
-
-	state, err := s.repo.GetTenantSchemaState(s.ctx, created.ID)
-	s.Require().NoError(err)
-	s.Equal("disabled", state)
-}
-
-func (s *TenantRepoTestSuite) TestGetTenantSchemaState_SchemaNotFound() {
-	// Create a tenant and drop its schema
-	tenant := &Tenant{
-		Name:     "no-schema-tenant",
-		Metadata: []byte(`{}`),
-	}
-	created, err := s.repo.Create(s.ctx, tenant)
-	s.Require().NoError(err)
-
-	// Drop the schema
 	schemaName := TenantSchema(created.ID)
 	_, err = s.pool.Exec(s.ctx, "DROP SCHEMA IF EXISTS \""+schemaName+"\" CASCADE")
 	s.Require().NoError(err)
 
-	_, err = s.repo.GetTenantSchemaState(s.ctx, created.ID)
-	s.ErrorIs(err, ErrSchemaNotFound)
+	info, err := s.repo.GetSchemaInfo(s.ctx, created.ID)
+	s.Require().NoError(err)
+	s.False(info.Exists)
+	s.False(info.Migrated)
 }
 
 func (s *TenantRepoTestSuite) TestDeleteTenantSchema_Success() {
@@ -574,7 +512,7 @@ func RunControllerMigrations(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// ensureTenantProbeTable creates a table in the tenant schema so GetTenantSchemaState reports "up".
+// ensureTenantProbeTable creates a table in the tenant schema so GetSchemaInfo reports Migrated=true.
 // Real queue/consumer migrations are not part of this module; tests only need a non-empty schema.
 func ensureTenantProbeTable(t *testing.T, ctx context.Context, pool *pgxpool.Pool, schemaName string) {
 	t.Helper()

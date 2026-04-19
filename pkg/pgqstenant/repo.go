@@ -16,15 +16,14 @@ import (
 )
 
 var (
-	ErrSchemaNotFound = errors.New("tenant schema not found")
-	ErrNilTenant      = errors.New("nil tenant")
+	ErrNilTenant = errors.New("nil tenant")
 )
 
 type TenantRepo struct {
 	pool *postgres.DBPool
 }
 
-func NewTenantRepo(pool *postgres.DBPool) *TenantRepo {
+func NewRepo(pool *postgres.DBPool) *TenantRepo {
 	return &TenantRepo{pool}
 }
 
@@ -35,7 +34,6 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 		return nil, ErrNilTenant
 	}
 
-	tenant.State = "created"
 	tenantsTableName := TenantsTable()
 	tenantSQL, args, errSQL := postgres.SQL().
 		Insert(tenantsTableName).
@@ -45,7 +43,6 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 				"name",
 				goqu.Record{
 					"status":     "created",
-					"state":      "created",
 					"updated_at": time.Now().UTC(),
 				},
 			).Where(goqu.T(TenantsTableName).Col("status").Eq("disabled")),
@@ -210,44 +207,43 @@ func (tr *TenantRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// GetTenantSchemaState retrieves the current state of the tenant's schema based on its existence, tables, and status.
-// Possible states returned: "Up", "Down", "Disabled". Returns an error if the database query fails.
-func (tr *TenantRepo) GetTenantSchemaState(ctx context.Context, tenantID uuid.UUID) (string, error) {
+// GetSchemaInfo checks whether a tenant's schema exists and has been migrated.
+func (tr *TenantRepo) GetSchemaInfo(ctx context.Context, tenantID uuid.UUID) (*SchemaInfo, error) {
 	schemaName := TenantSchema(tenantID)
-	schemaExistsSQL := `
-        SELECT
-            EXISTS(
-                SELECT 1 FROM information_schema.schemata
-                WHERE schema_name = $1
-                LIMIT 1
-            ) AS schema_exists,
-            EXISTS(
-                SELECT 1 FROM pgqs.tenants
-                WHERE id = $2 AND status = 'disabled'
-            ) AS is_disabled,
-            (
-                SELECT COUNT(*) FROM information_schema.tables
-                WHERE table_schema = $1 AND table_name != 'schema_migrations'
-            ) AS schema_tables_count
-    `
 
-	log.Debug("TenantRepo.GetTenantSchemaState", log.F("sql", schemaExistsSQL))
-
-	var state TenantSchemaState
-	if err := pgxscan.Get(ctx, tr.pool, &state, schemaExistsSQL, schemaName, tenantID); err != nil {
-		return "", err
+	tx, err := tr.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	switch {
-	case !state.SchemaExists:
-		return "", ErrSchemaNotFound
-	case state.SchemaTablesCount == 0:
-		return Down, nil
-	case state.IsDisabled:
-		return Disabled, nil
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var info SchemaInfo
+
+	errExists := tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)`,
+		schemaName,
+	).Scan(&info.Exists)
+	if errExists != nil {
+		return nil, errExists
 	}
 
-	return Up, nil
+	if !info.Exists {
+		return &info, tx.Commit(ctx)
+	}
+
+	var tableCount int
+	errCount := tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = $1 AND table_name != 'schema_migrations'`,
+		schemaName,
+	).Scan(&tableCount)
+	if errCount != nil {
+		return nil, errCount
+	}
+
+	info.Migrated = tableCount > 0
+
+	return &info, tx.Commit(ctx)
 }
 
 // DeleteTenantSchema removes the database schema and tenant record associated with the given tenant ID.
