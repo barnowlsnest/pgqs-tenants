@@ -59,9 +59,13 @@ func (m *mockRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID) e
 	return m.Called(ctx, tenantID).Error(0)
 }
 
-func (m *mockRepo) GetTenantSchemaState(ctx context.Context, tenantID uuid.UUID) (string, error) {
+func (m *mockRepo) GetSchemaInfo(ctx context.Context, tenantID uuid.UUID) (*SchemaInfo, error) {
 	args := m.Called(ctx, tenantID)
-	return args.String(0), args.Error(1)
+	var info *SchemaInfo
+	if v := args.Get(0); v != nil {
+		info = v.(*SchemaInfo)
+	}
+	return info, args.Error(1)
 }
 
 var _ Repo = (*mockRepo)(nil)
@@ -143,16 +147,16 @@ func (s *ServiceTestSuite) TestCreateTenant() {
 
 	cases := []struct {
 		name        string
-		input       *Model
+		input       *Tenant
 		matchTenant func(*Tenant) bool
 		repoReturn  *Tenant
 		repoErr     error
-		wantModel   *Model
+		want        *Tenant
 		wantErr     bool
 	}{
 		{
-			name:  "happy path forwards name and metadata, maps response",
-			input: &Model{Name: "alpha", Metadata: []byte(`{"k":"v"}`)},
+			name:  "happy path forwards name and metadata",
+			input: &Tenant{Name: "alpha", Metadata: []byte(`{"k":"v"}`)},
 			matchTenant: func(t *Tenant) bool {
 				return t != nil && t.Name == "alpha" && string(t.Metadata) == `{"k":"v"}`
 			},
@@ -160,13 +164,12 @@ func (s *ServiceTestSuite) TestCreateTenant() {
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
-				State:      "created",
 				Status:     "created",
 				CreatedAt:  now,
 				UpdatedAt:  now,
 				Metadata:   []byte(`{"k":"v"}`),
 			},
-			wantModel: &Model{
+			want: &Tenant{
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
@@ -178,7 +181,7 @@ func (s *ServiceTestSuite) TestCreateTenant() {
 		},
 		{
 			name:  "repo error propagates and result is nil",
-			input: &Model{Name: "beta"},
+			input: &Tenant{Name: "beta"},
 			matchTenant: func(t *Tenant) bool {
 				return t != nil && t.Name == "beta"
 			},
@@ -201,7 +204,7 @@ func (s *ServiceTestSuite) TestCreateTenant() {
 				s.Nil(got)
 			} else {
 				s.Require().NoError(err)
-				s.Equal(tc.wantModel, got)
+				s.Equal(tc.want, got)
 			}
 			s.repo.AssertExpectations(s.T())
 		})
@@ -215,16 +218,16 @@ func (s *ServiceTestSuite) TestUpdateTenant() {
 
 	cases := []struct {
 		name        string
-		input       *Model
+		input       *Tenant
 		matchParams func(*UpdateTenantParams) bool
 		repoReturn  *Tenant
 		repoErr     error
-		wantModel   *Model
+		want        *Tenant
 		wantErr     bool
 	}{
 		{
 			name: "happy path forwards id, status, metadata",
-			input: &Model{
+			input: &Tenant{
 				ID:       tenantID,
 				Status:   "ready",
 				Metadata: []byte(`{"env":"prod"}`),
@@ -236,13 +239,12 @@ func (s *ServiceTestSuite) TestUpdateTenant() {
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
-				State:      "ready",
 				Status:     "ready",
 				CreatedAt:  now,
 				UpdatedAt:  now,
 				Metadata:   []byte(`{"env":"prod"}`),
 			},
-			wantModel: &Model{
+			want: &Tenant{
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
@@ -254,7 +256,7 @@ func (s *ServiceTestSuite) TestUpdateTenant() {
 		},
 		{
 			name: "repo error propagates and result is nil",
-			input: &Model{
+			input: &Tenant{
 				ID:     tenantID,
 				Status: "ready",
 			},
@@ -280,7 +282,7 @@ func (s *ServiceTestSuite) TestUpdateTenant() {
 				s.Nil(got)
 			} else {
 				s.Require().NoError(err)
-				s.Equal(tc.wantModel, got)
+				s.Equal(tc.want, got)
 			}
 			s.repo.AssertExpectations(s.T())
 		})
@@ -294,26 +296,25 @@ func (s *ServiceTestSuite) TestGetTenant() {
 
 	cases := []struct {
 		name       string
-		input      *Model
+		inputID    uuid.UUID
 		repoReturn *Tenant
 		repoErr    error
-		wantModel  *Model
+		want       *Tenant
 		wantErr    bool
 	}{
 		{
-			name:  "happy path maps entity to model",
-			input: &Model{ID: tenantID},
+			name:    "happy path returns tenant",
+			inputID: tenantID,
 			repoReturn: &Tenant{
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
-				State:      "created",
 				Status:     "created",
 				CreatedAt:  now,
 				UpdatedAt:  now,
 				Metadata:   []byte(`{}`),
 			},
-			wantModel: &Model{
+			want: &Tenant{
 				ID:         tenantID,
 				Name:       "alpha",
 				SchemaName: TenantSchema(tenantID),
@@ -325,7 +326,7 @@ func (s *ServiceTestSuite) TestGetTenant() {
 		},
 		{
 			name:    "repo error propagates and result is nil",
-			input:   &Model{ID: tenantID},
+			inputID: tenantID,
 			repoErr: repoErr,
 			wantErr: true,
 		},
@@ -335,17 +336,17 @@ func (s *ServiceTestSuite) TestGetTenant() {
 		s.Run(tc.name, func() {
 			s.resetMock()
 			s.repo.
-				On("Get", mock.Anything, tenantID).
+				On("Get", mock.Anything, tc.inputID).
 				Return(tc.repoReturn, tc.repoErr)
 
-			got, err := s.svc.GetTenant(s.ctx, tc.input)
+			got, err := s.svc.GetTenant(s.ctx, tc.inputID)
 
 			if tc.wantErr {
 				s.Require().Error(err)
 				s.Nil(got)
 			} else {
 				s.Require().NoError(err)
-				s.Equal(tc.wantModel, got)
+				s.Equal(tc.want, got)
 			}
 			s.repo.AssertExpectations(s.T())
 		})
@@ -357,19 +358,7 @@ func (s *ServiceTestSuite) TestGetAllTenants() {
 	now := time.Now().UTC()
 	repoErr := errors.New("repo getall failed")
 
-	multiEntities := []*Tenant{
-		{
-			ID: id1, Name: "alpha", SchemaName: TenantSchema(id1),
-			State: "created", Status: "created",
-			CreatedAt: now, UpdatedAt: now, Metadata: []byte(`{}`),
-		},
-		{
-			ID: id2, Name: "beta", SchemaName: TenantSchema(id2),
-			State: "ready", Status: "ready",
-			CreatedAt: now, UpdatedAt: now, Metadata: []byte(`{}`),
-		},
-	}
-	multiModels := []*Model{
+	multiTenants := []*Tenant{
 		{
 			ID: id1, Name: "alpha", SchemaName: TenantSchema(id1),
 			Status:    "created",
@@ -386,18 +375,18 @@ func (s *ServiceTestSuite) TestGetAllTenants() {
 		name       string
 		repoReturn []*Tenant
 		repoErr    error
-		wantModels []*Model
+		want       []*Tenant
 		wantErr    bool
 	}{
 		{
 			name:       "happy empty",
 			repoReturn: []*Tenant{},
-			wantModels: []*Model{},
+			want:       []*Tenant{},
 		},
 		{
-			name:       "happy multiple preserves order and maps each",
-			repoReturn: multiEntities,
-			wantModels: multiModels,
+			name:       "happy multiple preserves order",
+			repoReturn: multiTenants,
+			want:       multiTenants,
 		},
 		{
 			name:    "repo error propagates and result is nil",
@@ -420,7 +409,7 @@ func (s *ServiceTestSuite) TestGetAllTenants() {
 				s.Nil(got)
 			} else {
 				s.Require().NoError(err)
-				s.Equal(tc.wantModels, got)
+				s.Equal(tc.want, got)
 			}
 			s.repo.AssertExpectations(s.T())
 		})
@@ -433,17 +422,17 @@ func (s *ServiceTestSuite) TestDisableTenant() {
 
 	cases := []struct {
 		name    string
-		input   *Model
+		inputID uuid.UUID
 		repoErr error
 		wantErr bool
 	}{
 		{
-			name:  "happy path forwards id",
-			input: &Model{ID: tenantID},
+			name:    "happy path forwards id",
+			inputID: tenantID,
 		},
 		{
 			name:    "repo error propagates",
-			input:   &Model{ID: tenantID},
+			inputID: tenantID,
 			repoErr: repoErr,
 			wantErr: true,
 		},
@@ -453,10 +442,10 @@ func (s *ServiceTestSuite) TestDisableTenant() {
 		s.Run(tc.name, func() {
 			s.resetMock()
 			s.repo.
-				On("SoftDelete", mock.Anything, tenantID).
+				On("SoftDelete", mock.Anything, tc.inputID).
 				Return(tc.repoErr)
 
-			err := s.svc.DisableTenant(s.ctx, tc.input)
+			err := s.svc.DisableTenant(s.ctx, tc.inputID)
 
 			if tc.wantErr {
 				s.Require().Error(err)
@@ -474,17 +463,17 @@ func (s *ServiceTestSuite) TestPurgeTenant() {
 
 	cases := []struct {
 		name    string
-		input   *Model
+		inputID uuid.UUID
 		repoErr error
 		wantErr bool
 	}{
 		{
-			name:  "happy path forwards id",
-			input: &Model{ID: tenantID},
+			name:    "happy path forwards id",
+			inputID: tenantID,
 		},
 		{
 			name:    "repo error propagates",
-			input:   &Model{ID: tenantID},
+			inputID: tenantID,
 			repoErr: repoErr,
 			wantErr: true,
 		},
@@ -494,15 +483,74 @@ func (s *ServiceTestSuite) TestPurgeTenant() {
 		s.Run(tc.name, func() {
 			s.resetMock()
 			s.repo.
-				On("DeleteTenantSchema", mock.Anything, tenantID).
+				On("DeleteTenantSchema", mock.Anything, tc.inputID).
 				Return(tc.repoErr)
 
-			err := s.svc.PurgeTenant(s.ctx, tc.input)
+			err := s.svc.PurgeTenant(s.ctx, tc.inputID)
 
 			if tc.wantErr {
 				s.Require().Error(err)
 			} else {
 				s.Require().NoError(err)
+			}
+			s.repo.AssertExpectations(s.T())
+		})
+	}
+}
+
+func (s *ServiceTestSuite) TestGetSchemaInfo() {
+	tenantID := uuid.New()
+	repoErr := errors.New("repo get schema info failed")
+
+	cases := []struct {
+		name       string
+		inputID    uuid.UUID
+		repoReturn *SchemaInfo
+		repoErr    error
+		wantInfo   *SchemaInfo
+		wantErr    bool
+	}{
+		{
+			name:       "happy path exists and migrated",
+			inputID:    tenantID,
+			repoReturn: &SchemaInfo{Exists: true, Migrated: true},
+			wantInfo:   &SchemaInfo{Exists: true, Migrated: true},
+		},
+		{
+			name:       "happy path exists not migrated",
+			inputID:    tenantID,
+			repoReturn: &SchemaInfo{Exists: true, Migrated: false},
+			wantInfo:   &SchemaInfo{Exists: true, Migrated: false},
+		},
+		{
+			name:       "happy path does not exist",
+			inputID:    tenantID,
+			repoReturn: &SchemaInfo{Exists: false, Migrated: false},
+			wantInfo:   &SchemaInfo{Exists: false, Migrated: false},
+		},
+		{
+			name:    "repo error propagates",
+			inputID: tenantID,
+			repoErr: repoErr,
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			s.resetMock()
+			s.repo.
+				On("GetSchemaInfo", mock.Anything, tc.inputID).
+				Return(tc.repoReturn, tc.repoErr)
+
+			got, err := s.svc.GetSchemaInfo(s.ctx, tc.inputID)
+
+			if tc.wantErr {
+				s.Require().Error(err)
+				s.Nil(got)
+			} else {
+				s.Require().NoError(err)
+				s.Equal(tc.wantInfo, got)
 			}
 			s.repo.AssertExpectations(s.T())
 		})

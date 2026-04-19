@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS pgqs.tenants (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT tenants_name_unique UNIQUE (name),
-    CONSTRAINT tenants_status_check CHECK (state IN ('created', 'ready', 'disabled'))
+    CONSTRAINT tenants_status_check CHECK (status IN ('created', 'ready', 'disabled'))
 );
