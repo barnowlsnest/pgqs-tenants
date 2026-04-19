@@ -1,4 +1,4 @@
-module github.com/barnowlsnest/pgqs-tenants
+module github.com/barnowlsnest/pgqs-tenants/v2
 
 go 1.26.1
 
