@@ -43,7 +43,7 @@ type TenantRepoTestSuite struct {
 func (s *TenantRepoTestSuite) SetupSuite() {
 	s.pool, s.cleanup = SetupTestContainer(s.T())
 	RunControllerMigrations(s.T(), s.pool)
-	s.repo = NewTenantRepo(s.pool)
+	s.repo = NewRepo(s.pool)
 	s.ctx = context.Background()
 }
 

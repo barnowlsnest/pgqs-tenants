@@ -48,9 +48,9 @@ func WithTenantRepo(repo Repo) ConfigFunc {
 	}
 }
 
-// New creates and initializes a new Service instance with the provided configuration options.
+// NewService creates and initializes a new Service instance with the provided configuration options.
 // Returns a pointer to the Service and an error if validation fails.
-func New(opts ...ConfigFunc) (*Service, error) {
+func NewService(opts ...ConfigFunc) (*Service, error) {
 	srv := &Service{}
 	for _, opt := range opts {
 		opt(srv)

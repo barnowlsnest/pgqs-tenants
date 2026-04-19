@@ -88,7 +88,7 @@ func (s *ServiceTestSuite) TearDownTest() {
 
 func (s *ServiceTestSuite) resetMock() {
 	s.repo = new(mockRepo)
-	svc, err := New(WithDB("postgres://stub"), WithTenantRepo(s.repo))
+	svc, err := NewService(WithDB("postgres://stub"), WithTenantRepo(s.repo))
 	s.Require().NoError(err)
 	s.svc = svc
 }
@@ -122,7 +122,7 @@ func (s *ServiceTestSuite) TestNew() {
 
 	for _, tc := range cases {
 		s.Run(tc.name, func() {
-			got, err := New(tc.opts...)
+			got, err := NewService(tc.opts...)
 
 			if tc.wantErr != nil {
 				s.Require().Error(err)

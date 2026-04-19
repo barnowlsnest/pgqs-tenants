@@ -1,14 +1,5 @@
 BEGIN;
 
-ALTER TABLE pgqs.tenants ADD COLUMN status TEXT NOT NULL DEFAULT 'created';
-
-UPDATE pgqs.tenants SET status = 'disabled' WHERE is_deleted = true;
-
-ALTER TABLE pgqs.tenants DROP COLUMN is_deleted;
-
-ALTER TABLE pgqs.tenants ADD CONSTRAINT tenants_status_check
-    CHECK (status IN ('created', 'ready', 'disabled'));
-
 CREATE OR REPLACE FUNCTION pgqs.notify_tenant_status_change()
 RETURNS TRIGGER AS $$
 BEGIN

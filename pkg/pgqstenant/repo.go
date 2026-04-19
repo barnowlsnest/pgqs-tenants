@@ -24,7 +24,7 @@ type TenantRepo struct {
 	pool *postgres.DBPool
 }
 
-func NewTenantRepo(pool *postgres.DBPool) *TenantRepo {
+func NewRepo(pool *postgres.DBPool) *TenantRepo {
 	return &TenantRepo{pool}
 }
 
