@@ -13,7 +13,7 @@ var embeddedMigrations embed.FS
 
 // RollOut applies pgqs database migrations.
 func RollOut(ctx context.Context, dbURL string) error {
-	driver, err := iofs.New(embeddedMigrations, "./migrations")
+	driver, err := iofs.New(embeddedMigrations, "migrations")
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func RollOut(ctx context.Context, dbURL string) error {
 
 // RollDown rolls down pgqs database migrations.
 func RollDown(ctx context.Context, dbURL string) error {
-	driver, err := iofs.New(embeddedMigrations, "./migrations")
+	driver, err := iofs.New(embeddedMigrations, "migrations")
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,7 +22,10 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
+	"github.com/barnowlsnest/pgqs-tenants/v2/pkg/pgqsdb"
+
 	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 )
 
 const (
@@ -42,7 +44,9 @@ type TenantRepoTestSuite struct {
 
 func (s *TenantRepoTestSuite) SetupSuite() {
 	s.pool, s.cleanup = SetupTestContainer(s.T())
-	RunControllerMigrations(s.T(), s.pool)
+
+	err := pgqsdb.RollOut(s.T().Context(), s.pool.Config().ConnString())
+	s.NoError(err)
 	s.repo = NewRepo(s.pool)
 	s.ctx = context.Background()
 }
@@ -478,38 +482,6 @@ func SetupTestContainer(t *testing.T) (pool *pgxpool.Pool, cleanup func()) {
 	}
 
 	return pool, cleanup
-}
-
-// RunControllerMigrations applies SQL from ./migrations (*.sql at repo root).
-func RunControllerMigrations(t *testing.T, pool *pgxpool.Pool) {
-	t.Helper()
-	ctx := context.Background()
-	migrationsPath := filepath.Join(projectRoot(), "migrations")
-	sourceURL := "file://" + migrationsPath
-
-	conn, err := pool.Acquire(ctx)
-	require.NoError(t, err)
-	defer conn.Release()
-
-	cfg := conn.Conn().Config()
-	dbURL := "postgres://" + cfg.User + ":" + cfg.Password +
-		"@" + cfg.Host + ":" + strconv.Itoa(int(cfg.Port)) +
-		"/" + cfg.Database + "?sslmode=disable"
-
-	m, err := migrate.New(sourceURL, dbURL)
-	require.NoError(t, err)
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		t.Fatalf("failed to run migrations: %v", err)
-	}
-
-	srcErr, dbErr := m.Close()
-	if srcErr != nil {
-		t.Logf("failed to close migration source: %v", srcErr)
-	}
-	if dbErr != nil {
-		t.Logf("failed to close migration db: %v", dbErr)
-	}
 }
 
 // ensureTenantProbeTable creates a table in the tenant schema so GetSchemaInfo reports Migrated=true.

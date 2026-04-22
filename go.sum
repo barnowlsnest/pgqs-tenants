@@ -20,6 +20,8 @@ github.com/barnowlsnest/pgqs-harness v1.3.0 h1:wWApMTR3+fBVHxHVXcTq3nCblQG1rA5F0
 github.com/barnowlsnest/pgqs-harness v1.3.0/go.mod h1:qWR5JR3YcaoqC93dF645shhpPuBrhKF71f7sBdM1E1I=
 github.com/barnowlsnest/pgqs-harness v1.3.1 h1:ToWU2E+aIkQG4iWFACx+cMrMpmvRMXPaehjbczkHrCk=
 github.com/barnowlsnest/pgqs-harness v1.3.1/go.mod h1:qWR5JR3YcaoqC93dF645shhpPuBrhKF71f7sBdM1E1I=
+github.com/barnowlsnest/pgqs-harness v1.3.2 h1:jOSKDP3JKjYgR+AIW2HxV9zW+yE2tQGRpCCn3mnjn6s=
+github.com/barnowlsnest/pgqs-harness v1.3.2/go.mod h1:qWR5JR3YcaoqC93dF645shhpPuBrhKF71f7sBdM1E1I=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
