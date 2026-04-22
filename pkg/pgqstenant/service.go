@@ -143,16 +143,6 @@ func (s *Service) GetSchemaInfo(ctx context.Context, id uuid.UUID) (*SchemaInfo,
 	return info, nil
 }
 
-// Up applies the latest migrations for a tenant's schema and returns an error if unsuccessful.
-func (s *Service) Up(tenantID uuid.UUID) error {
-	return MigrateUP(s.dbURL, tenantID)
-}
-
-// Down tears down the migration for a tenant's schema and returns an error if unsuccessful.
-func (s *Service) Down(tenantID uuid.UUID) error {
-	return MigrateDOWN(s.dbURL, tenantID)
-}
-
 func (s *Service) validate() error {
 	switch {
 	case s.dbURL == "":
