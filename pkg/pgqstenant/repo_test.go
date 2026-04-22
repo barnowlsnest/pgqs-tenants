@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -430,15 +428,6 @@ func (s *TenantRepoTestSuite) TestDeleteTenantSchema_NotFound() {
 	err := s.repo.DeleteTenantSchema(s.ctx, randomID)
 	s.Error(err)
 	s.Contains(err.Error(), "tenant not found")
-}
-
-// projectRoot returns the absolute path to the module root (directory containing repo_test.go).
-func projectRoot() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("failed to get caller information")
-	}
-	return filepath.Dir(file)
 }
 
 // skipIfDockerNotAvailable skips the test if Docker is not available.
