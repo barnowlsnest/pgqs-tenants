@@ -1,4 +1,4 @@
-package pgqstenant
+package tenants
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/barnowlsnest/pgqs-tenants/v2/pkg/pgqsdb"
+	"github.com/barnowlsnest/pgqs-tenants/v3/pkg/pgqsdb"
 
 	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
