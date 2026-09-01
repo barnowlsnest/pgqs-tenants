@@ -1,4 +1,4 @@
-package pgqsdb
+package database
 
 import (
 	"context"
