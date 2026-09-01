@@ -20,7 +20,7 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/barnowlsnest/pgqs-tenants/v3/pkg/pgqsdb"
+	"github.com/barnowlsnest/pgqs-tenants/v3/pkg/database"
 
 	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -43,7 +43,7 @@ type TenantRepoTestSuite struct {
 func (s *TenantRepoTestSuite) SetupSuite() {
 	s.pool, s.cleanup = SetupTestContainer(s.T())
 
-	err := pgqsdb.RollOut(s.T().Context(), s.pool.Config().ConnString())
+	err := database.RollOut(s.T().Context(), s.pool.Config().ConnString())
 	s.NoError(err)
 	s.repo = NewRepo(s.pool)
 	s.ctx = context.Background()
