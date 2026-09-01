@@ -11,7 +11,7 @@ Each tenant gets its own PostgreSQL schema (`pgqs_tenant_<uuid>`), created autom
 | Package       | Description                                                   |
 |---------------|---------------------------------------------------------------|
 | `pkg/tenants` | `TenantRepo` — CRUD operations and schema management          |
-| `pkg/pgqsdb`  | `RollOut` / `RollDown` — applies embedded database migrations |
+| `pkg/database`| `RollOut` / `RollDown` — applies embedded database migrations |
 
 ## Installation
 
