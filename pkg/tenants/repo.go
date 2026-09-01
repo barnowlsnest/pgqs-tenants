@@ -19,6 +19,13 @@ var (
 	ErrNilTenant = errors.New("nil tenant")
 )
 
+const (
+	colStatus    = "status"
+	colUpdatedAt = "updated_at"
+	colID        = "id"
+	colMetadata  = "metadata"
+)
+
 type TenantRepo struct {
 	pool *postgres.DBPool
 }
@@ -42,10 +49,10 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 			goqu.DoUpdate(
 				"name",
 				goqu.Record{
-					"status":     "created",
-					"updated_at": time.Now().UTC(),
+					colStatus:    "created",
+					colUpdatedAt: time.Now().UTC(),
 				},
-			).Where(goqu.T(TenantsTableName).Col("status").Eq("disabled")),
+			).Where(goqu.T(TenantsTableName).Col(colStatus).Eq("disabled")),
 		).
 		Returning(goqu.Star()).
 		Prepared(true).
@@ -82,18 +89,18 @@ func (tr *TenantRepo) Create(ctx context.Context, tenant *Tenant) (*Tenant, erro
 func (tr *TenantRepo) Update(
 	ctx context.Context, id uuid.UUID, params *UpdateTenantParams,
 ) (*Tenant, error) {
-	record := goqu.Record{"updated_at": time.Now().UTC()}
+	record := goqu.Record{colUpdatedAt: time.Now().UTC()}
 	if status := params.Status; status != "" {
-		record["status"] = status
+		record[colStatus] = status
 	}
 	if metadata := params.Metadata; metadata != nil {
-		record["metadata"] = metadata
+		record[colMetadata] = metadata
 	}
 
 	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().Update(tenantsTableName).
 		Set(record).
-		Where(goqu.C("id").Eq(id.String())).
+		Where(goqu.C(colID).Eq(id.String())).
 		Returning(goqu.Star()).
 		Prepared(true).
 		ToSQL()
@@ -117,7 +124,7 @@ func (tr *TenantRepo) Get(ctx context.Context, id uuid.UUID) (*Tenant, error) {
 	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().
 		From(tenantsTableName).
-		Where(goqu.C("id").Eq(id.String())).
+		Where(goqu.C(colID).Eq(id.String())).
 		Prepared(true).
 		ToSQL()
 
@@ -165,14 +172,14 @@ func (tr *TenantRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
 		Update(tenantsTableName).
 		Set(
 			goqu.Record{
-				"status":     "disabled",
-				"updated_at": time.Now().UTC(),
+				colStatus:    "disabled",
+				colUpdatedAt: time.Now().UTC(),
 			},
 		).
 		Where(
 			goqu.And(
-				goqu.C("id").Eq(id.String()),
-				goqu.C("status").Neq("disabled"),
+				goqu.C(colID).Eq(id.String()),
+				goqu.C(colStatus).Neq("disabled"),
 			),
 		).
 		Prepared(true).
@@ -257,7 +264,7 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 
 	tenantsTableName := TenantsTable()
 	sql, args, errSQL := postgres.SQL().Delete(tenantsTableName).
-		Where(goqu.C("id").Eq(tenantID.String())).
+		Where(goqu.C(colID).Eq(tenantID.String())).
 		Prepared(true).
 		ToSQL()
 
