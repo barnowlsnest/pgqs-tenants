@@ -1,4 +1,4 @@
-package tenants
+package pgtenant
 
 import (
 	"fmt"

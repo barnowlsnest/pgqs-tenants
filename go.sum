@@ -16,6 +16,8 @@ github.com/barnowlsnest/go-logslib/v2 v2.2.0 h1:qYI12w8k9N+sCkEqK13gHBG9ahOxiP5A
 github.com/barnowlsnest/go-logslib/v2 v2.2.0/go.mod h1:/pGgO8hpJGzY9yDxneami5P3acSsV4Se/hcCdn16x3k=
 github.com/barnowlsnest/pgqs-harness v1.3.4 h1:lcA/ZWyhOmMNcjPs6HlghzKZnQ46rD5FQMmgGIsdEDw=
 github.com/barnowlsnest/pgqs-harness v1.3.4/go.mod h1:zD3gEATIx2vAeR+R2ae4YC7/wjcM2iXUZftZQNh1lF0=
+github.com/barnowlsnest/pgqs-harness v1.4.0 h1:tjf96ydjQacoxccKHAxIuX/i/4XUzuGEY9pdsHw6MSY=
+github.com/barnowlsnest/pgqs-harness v1.4.0/go.mod h1:dmnYiZkhTpubVN35/Dco2oTWzRVCDnpp1LhwzxJb04o=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
