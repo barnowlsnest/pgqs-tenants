@@ -1,4 +1,4 @@
-# pgqs-tenants
+# pgqs-tenants      
 
 A Go library for managing PostgreSQL-based multi-tenant infrastructure within the [pgqs](https://github.com/barnowlsnest) ecosystem. It provides tenant lifecycle management — create, update, soft-delete, and purge — backed by schema-per-tenant isolation and `LISTEN/NOTIFY` change events.
 
@@ -10,8 +10,8 @@ Each tenant gets its own PostgreSQL schema (`pgqs_tenant_<uuid>`), created autom
 
 | Package       | Description                                                   |
 |---------------|---------------------------------------------------------------|
-| `pkg/tenants` | `TenantRepo` — CRUD operations and schema management          |
-| `pkg/database`| `RollOut` / `RollDown` — applies embedded database migrations |
+| `pkg/pgtenant` | `TenantRepo` — CRUD operations and schema management         |
+| `pkg/database` | `RollOut` / `RollDown` — applies embedded database migrations |
 
 ## Installation
 
@@ -28,9 +28,9 @@ Requires Go 1.26+ and PostgreSQL 14+.
 Run this once at application startup before creating any tenants. It creates the `pgqs` schema and the `tenants` table.
 
 ```go
-import "github.com/barnowlsnest/pgqs-tenants/v3/pkg/pgqsdb"
+import "github.com/barnowlsnest/pgqs-tenants/v3/pkg/database"
 
-if err := pgqsdb.RollOut(ctx, dbURL); err != nil {
+if err := database.RollOut(ctx, dbURL); err != nil {
     log.Fatal(err)
 }
 ```
@@ -39,14 +39,14 @@ if err := pgqsdb.RollOut(ctx, dbURL); err != nil {
 
 ```go
 import (
-    "github.com/barnowlsnest/pgqs-tenants/v3/pkg/tenants"
+    "github.com/barnowlsnest/pgqs-tenants/v3/pkg/pgtenant"
     harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
 )
 
 pool, _ := harnesspg.NewPool(ctx, dbURL)
-repo := tenants.NewRepo(pool)
+repo := pgtenant.NewRepo(pool)
 
-tenant, err := repo.Create(ctx, &tenants.Tenant{
+tenant, err := repo.Create(ctx, &pgtenant.Tenant{
     Name:     "acme",
     Metadata: []byte(`{"engine": "standard"}`),
 })
@@ -68,7 +68,7 @@ all, err := repo.GetAll(ctx)
 ### Update a tenant
 
 ```go
-updated, err := repo.Update(ctx, tenantID, &tenants.UpdateTenantParams{
+updated, err := repo.Update(ctx, tenantID, &pgtenant.UpdateTenantParams{
     Status:   "ready",
     Metadata: []byte(`{"engine": "premium"}`),
 })
@@ -139,7 +139,7 @@ The database emits a notification on the `tenants` channel for every lifecycle e
 Tenant schemas follow the pattern `pgqs_tenant_<uuid>` and are generated as a stored computed column — the name is immutable and consistent.
 
 ```go
-schemaName := tenants.TenantSchema(tenantID) // "pgqs_tenant_<uuid>"
+schemaName := pgtenant.TenantSchema(tenantID) // "pgqs_tenant_<uuid>"
 ```
 
 ## Testing

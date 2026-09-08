@@ -4,35 +4,20 @@ import (
 	"context"
 	"embed"
 
-	"github.com/barnowlsnest/pgqs-harness/mgr"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/barnowlsnest/pgqs-harness/db"
 )
 
 //go:embed migrations/*.sql
 var embeddedMigrations embed.FS
 
+const dirMigrations = "migrations"
+
 // RollOut applies pgqs database migrations.
 func RollOut(ctx context.Context, dbURL string) error {
-	driver, err := iofs.New(embeddedMigrations, "migrations")
-	if err != nil {
-		return err
-	}
-
-	return mgr.Up(ctx, &mgr.Config{
-		DBURL:       dbURL,
-		EmbeddedSRC: driver,
-	})
+	return db.RollOut(ctx, &embeddedMigrations, dbURL, dirMigrations)
 }
 
 // RollDown rolls down pgqs database migrations.
 func RollDown(ctx context.Context, dbURL string) error {
-	driver, err := iofs.New(embeddedMigrations, "migrations")
-	if err != nil {
-		return err
-	}
-
-	return mgr.Down(ctx, &mgr.Config{
-		DBURL:       dbURL,
-		EmbeddedSRC: driver,
-	})
+	return db.RollDown(ctx, &embeddedMigrations, dbURL, dirMigrations)
 }
