@@ -17,25 +17,25 @@ Run a single test (the whole suite spins up one Postgres container in `SetupSuit
 go test -v -race ./pkg/pgtenant -run TestTenantRepoTestSuite/TestCreate_Success
 ```
 
-Tests use testcontainers-go and **require a running Docker daemon**. Requires Go 1.26+ and PostgreSQL 14+.
+Tests use testcontainers-go and **require a running Docker daemon**. Requires Go 1.27+ and PostgreSQL 14+.
 
-CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.
+CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.13. Both take the Go version from `go.mod`.
 
 ## Architecture
 
 This is a library (no `main`) for schema-per-tenant Postgres multi-tenancy in the pgqs ecosystem. Two packages:
 
 ### `pkg/database`
-Thin wrapper over `pgqs-harness/db`. Embeds `migrations/*.sql` (golang-migrate format, `NNNNNN_name.up/down.sql`) via `go:embed` and exposes `RollOut` / `RollDown`. Run `RollOut` once at startup before any tenant operations.
+Thin wrapper over `pgqs-harness/v2/db`. Embeds `migrations/*.sql` (golang-migrate format, `NNNNNN_name.up/down.sql`) via `go:embed` and exposes `RollOut` / `RollDown`. Run `RollOut` once at startup before any tenant operations.
 
 Migrations build the control plane in the `pgqs` schema:
 1. `pgqs` schema
 2. `pgqs.tenants` table — `status` CHECK constrained to `created` / `ready` / `disabled`; `name` unique
-3. `schema_name` — a `GENERATED ALWAYS AS ('pgqs_tenant_' || id) STORED` column (immutable, never set from Go)
+3. `schema_name` — a `GENERATED ALWAYS AS ('pgqs_tenant_' || id::text) STORED` column (immutable, never set from Go), plus `idx_tenants_schema_name`
 4. `LISTEN/NOTIFY` triggers: AFTER INSERT, AFTER UPDATE (only when status changed), AFTER DELETE all `pg_notify` the `tenants` channel with `{"id","schema","event"}` where `event` is the new status or `"purged"` on delete
 
 ### `pkg/pgtenant`
-`TenantRepo` (constructed with `NewRepo(*postgres.DBPool)` from `pgqs-harness/postgres`) — all tenant lifecycle operations. SQL is built with goqu (`postgres.SQL()`), rows scanned with scany/pgxscan.
+`TenantRepo` (constructed with `NewRepo(*postgres.DBPool)` from `pgqs-harness/v2/postgres`; `DBPool` is a type alias for `pgxpool.Pool`) — all tenant lifecycle operations. SQL is built with goqu (`postgres.SQL()`), rows scanned with scany/pgxscan.
 
 Key behaviors:
 - **`Create`** runs in a transaction: upsert the `tenants` row, then `CREATE SCHEMA pgqs_tenant_<uuid>`. `ON CONFLICT (name)` only re-activates (sets status back to `created`) when the existing row is `disabled` — otherwise the conflict does nothing and the insert returns no row / an error. Schema creation and the row insert commit together.
