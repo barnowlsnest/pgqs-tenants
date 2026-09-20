@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/barnowlsnest/pgqs-harness/postgres"
+	"github.com/barnowlsnest/pgqs-harness/v2/postgres"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/google/uuid"
