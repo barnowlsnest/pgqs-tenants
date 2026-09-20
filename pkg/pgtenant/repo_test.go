@@ -22,7 +22,7 @@ import (
 
 	"github.com/barnowlsnest/pgqs-tenants/v3/pkg/database"
 
-	harnesspg "github.com/barnowlsnest/pgqs-harness/postgres"
+	harnesspg "github.com/barnowlsnest/pgqs-harness/v2/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 )
 
