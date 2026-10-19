@@ -43,8 +43,7 @@ Key behaviors:
 - **`DeleteTenantSchema`** ("purge") — transactionally deletes the row then `DROP SCHEMA ... CASCADE`. The DELETE trigger fires the `purged` notification.
 - **`GetAll`** orders active tenants before disabled ones.
 - **`GetSchemaInfo`** — `Exists` from `information_schema.schemata`; `Migrated` is true when the schema has any table other than `schema_migrations`.
-
-The `pgtenant` package does not run per-tenant migrations — it only creates the empty schema. Applying tenant-scoped migrations into that schema is the caller's responsibility.
+- **`RollOut` / `RollDown`** take the caller's golang-migrate files as an `fs.FS` rooted at the `.sql` files (use `fs.Sub` for an `embed.FS`) and run them via harness `mgr.Up`/`mgr.Down` with `TargetSchema` = tenant schema (`search_path`), using the pool's `ConnString()`. `ErrNoChange` is swallowed. Each tenant schema gets its own `schema_migrations`.
 
 ## Conventions
 

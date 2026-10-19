@@ -15,6 +15,7 @@ A Go library for schema-per-tenant PostgreSQL multi-tenancy, built for the [pgqs
 - **Immutable schema names** — derived in the database as a stored generated column, never written from Go.
 - **Event-driven** — triggers `pg_notify` the `tenants` channel on insert, status change and delete, so consumers can react to lifecycle changes.
 - **Embedded migrations** — the control-plane schema ships with the library via `go:embed` and golang-migrate.
+- **Per-tenant migrations** — roll your own DDL into a tenant schema with `RollOut` / `RollDown`.
 - **Soft delete and reactivation** — disabled tenants keep their data and can be revived by name.
 
 ## Requirements
@@ -33,7 +34,7 @@ go get github.com/barnowlsnest/pgqs-tenants/v3
 
 | Package        | Description                                                   |
 |----------------|---------------------------------------------------------------|
-| `pkg/pgtenant` | `TenantRepo` — CRUD operations and schema management          |
+| `pkg/pgtenant` | `TenantRepo` — CRUD, schema management and tenant migrations  |
 | `pkg/database` | `RollOut` / `RollDown` — applies embedded database migrations |
 
 ## Overview
@@ -157,7 +158,19 @@ info, err := repo.GetSchemaInfo(ctx, tenantID)
 
 ### Per-tenant migrations
 
-This library only creates the empty `pgqs_tenant_<uuid>` schema — it never runs tenant-scoped migrations. Applying those inside the schema is the caller's responsibility; `GetSchemaInfo` reports whether it has been done.
+`Create` only creates the empty `pgqs_tenant_<uuid>` schema. To apply your own DDL to it, pass golang-migrate files (`NNNNNN_name.up.sql` / `.down.sql`) as an `fs.FS` rooted at the `.sql` files:
+
+```go
+//go:embed migrations/*.sql
+var embedded embed.FS
+
+migrations, err := fs.Sub(embedded, "migrations")
+
+err = repo.RollOut(ctx, tenant, migrations)  // apply pending migrations
+err = repo.RollDown(ctx, tenant, migrations) // roll back all of them
+```
+
+Write SQL without a schema prefix (`CREATE TABLE orders (...)`): migrations run with `search_path` set to the tenant schema, so tables, indexes and the tenant's own `schema_migrations` table land there. Each tenant tracks its version independently, and re-running `RollOut` is a no-op when nothing is pending. For SQL built in code, any `fs.FS` works, e.g. `fstest.MapFS{"000001_init.up.sql": {Data: []byte("CREATE TABLE ...")}}`. Function bodies resolve names when they are called, so give tenant functions `SET search_path` or qualify names there. `GetSchemaInfo` reports whether a tenant schema has been migrated.
 
 ### LISTEN/NOTIFY events
 

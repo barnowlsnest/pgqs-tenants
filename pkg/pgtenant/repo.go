@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"time"
 
+	"github.com/barnowlsnest/pgqs-harness/v2/mgr"
 	"github.com/barnowlsnest/pgqs-harness/v2/postgres"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -16,7 +20,9 @@ import (
 )
 
 var (
-	ErrNilTenant = errors.New("nil tenant")
+	ErrNilTenant      = errors.New("nil tenant")
+	ErrNilMigrations  = errors.New("nil migrations")
+	ErrMigrationPanic = errors.New("tenant migration panicked")
 )
 
 const (
@@ -297,6 +303,76 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 	}
 
 	return nil
+}
+
+// RollOut applies the caller's migrations to the tenant schema.
+// migrations must be rooted at the golang-migrate files (NNNNNN_name.up.sql / .down.sql);
+// for an embed.FS use fs.Sub to step into the migrations' directory.
+// Unqualified names resolve to the tenant schema, which also holds its own schema_migrations table.
+func (tr *TenantRepo) RollOut(ctx context.Context, tenant *Tenant, migrations fs.FS) (err error) {
+	// a broken caller fs.FS or golang-migrate must never crash the host service
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %v", ErrMigrationPanic, r)
+		}
+	}()
+
+	cfg, errCfg := tr.migrationConfig(tenant, migrations)
+	if errCfg != nil {
+		return errCfg
+	}
+
+	if errUp := mgr.Up(ctx, cfg); errUp != nil && !errors.Is(errUp, migrate.ErrNoChange) {
+		return errUp
+	}
+
+	return nil
+}
+
+// RollDown rolls back all of the caller's migrations in the tenant schema.
+// migrations follow the same layout as in RollOut.
+func (tr *TenantRepo) RollDown(ctx context.Context, tenant *Tenant, migrations fs.FS) (err error) {
+	// a broken caller fs.FS or golang-migrate must never crash the host service
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %v", ErrMigrationPanic, r)
+		}
+	}()
+
+	cfg, errCfg := tr.migrationConfig(tenant, migrations)
+	if errCfg != nil {
+		return errCfg
+	}
+
+	if errDown := mgr.Down(ctx, cfg); errDown != nil && !errors.Is(errDown, migrate.ErrNoChange) {
+		return errDown
+	}
+
+	return nil
+}
+
+func (tr *TenantRepo) migrationConfig(tenant *Tenant, migrations fs.FS) (*mgr.Config, error) {
+	if tenant == nil {
+		return nil, ErrNilTenant
+	}
+
+	if migrations == nil {
+		return nil, ErrNilMigrations
+	}
+
+	src, errSrc := iofs.New(migrations, ".")
+	if errSrc != nil {
+		return nil, errSrc
+	}
+
+	schemaName := TenantSchema(tenant.ID)
+	log.Debug("TenantRepo.migrationConfig", log.F("schema", schemaName))
+
+	return &mgr.Config{
+		DBURL:        tr.pool.Config().ConnString(),
+		TargetSchema: schemaName,
+		EmbeddedSRC:  src,
+	}, nil
 }
 
 func (tr *TenantRepo) createTenantSchemaWithTX(ctx context.Context, tenantID uuid.UUID, tx pgx.Tx) error {
