@@ -436,7 +436,7 @@ func (s *TenantRepoTestSuite) TestRollOut_CreatesTablesInTenantSchema() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-tenant", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	err = s.repo.RollOut(s.ctx, created, s.tenantMigrations())
+	err = s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations())
 	s.Require().NoError(err)
 
 	schemaName := TenantSchema(created.ID)
@@ -454,8 +454,8 @@ func (s *TenantRepoTestSuite) TestRollOut_Idempotent() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-twice", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	s.Require().NoError(s.repo.RollOut(s.ctx, created, s.tenantMigrations()))
-	s.NoError(s.repo.RollOut(s.ctx, created, s.tenantMigrations()))
+	s.Require().NoError(s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()))
+	s.NoError(s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()))
 }
 
 func (s *TenantRepoTestSuite) TestRollOut_TenantsAreIsolated() {
@@ -464,14 +464,14 @@ func (s *TenantRepoTestSuite) TestRollOut_TenantsAreIsolated() {
 	untouched, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-isolated-b", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	s.Require().NoError(s.repo.RollOut(s.ctx, migrated, s.tenantMigrations()))
+	s.Require().NoError(s.repo.RollOut(s.ctx, migrated.ID, s.tenantMigrations()))
 
 	info, err := s.repo.GetSchemaInfo(s.ctx, untouched.ID)
 	s.Require().NoError(err)
 	s.False(info.Migrated)
 
 	// the second tenant tracks its own version, so it still gets the full rollout
-	s.Require().NoError(s.repo.RollOut(s.ctx, untouched, s.tenantMigrations()))
+	s.Require().NoError(s.repo.RollOut(s.ctx, untouched.ID, s.tenantMigrations()))
 	s.True(tableExists(s.T(), s.ctx, s.pool, TenantSchema(untouched.ID), "order_items"))
 }
 
@@ -484,21 +484,16 @@ func (s *TenantRepoTestSuite) TestRollOut_InMemoryMigrations() {
 		"000001_create_notes.down.sql": {Data: []byte("DROP TABLE notes;")},
 	}
 
-	s.Require().NoError(s.repo.RollOut(s.ctx, created, migrations))
+	s.Require().NoError(s.repo.RollOut(s.ctx, created.ID, migrations))
 	s.True(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "notes"))
-}
-
-func (s *TenantRepoTestSuite) TestRollOut_NilTenant() {
-	err := s.repo.RollOut(s.ctx, nil, s.tenantMigrations())
-	s.ErrorIs(err, ErrNilTenant)
 }
 
 func (s *TenantRepoTestSuite) TestRollDown_RemovesTables() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rolldown-tenant", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
-	s.Require().NoError(s.repo.RollOut(s.ctx, created, s.tenantMigrations()))
+	s.Require().NoError(s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()))
 
-	err = s.repo.RollDown(s.ctx, created, s.tenantMigrations())
+	err = s.repo.RollDown(s.ctx, created.ID, s.tenantMigrations())
 	s.Require().NoError(err)
 
 	schemaName := TenantSchema(created.ID)
@@ -514,26 +509,123 @@ func (s *TenantRepoTestSuite) TestRollDown_NothingToRollDown() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rolldown-empty", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	s.NoError(s.repo.RollDown(s.ctx, created, s.tenantMigrations()))
-}
-
-func (s *TenantRepoTestSuite) TestRollDown_NilTenant() {
-	err := s.repo.RollDown(s.ctx, nil, s.tenantMigrations())
-	s.ErrorIs(err, ErrNilTenant)
+	s.NoError(s.repo.RollDown(s.ctx, created.ID, s.tenantMigrations()))
 }
 
 func (s *TenantRepoTestSuite) TestRollOut_NilMigrations() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-nil-fs", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	s.ErrorIs(s.repo.RollOut(s.ctx, created, nil), ErrNilMigrations)
+	s.ErrorIs(s.repo.RollOut(s.ctx, created.ID, nil), ErrNilMigrations)
 }
 
 func (s *TenantRepoTestSuite) TestRollDown_NilMigrations() {
 	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rolldown-nil-fs", Metadata: []byte(`{}`)})
 	s.Require().NoError(err)
 
-	s.ErrorIs(s.repo.RollDown(s.ctx, created, nil), ErrNilMigrations)
+	s.ErrorIs(s.repo.RollDown(s.ctx, created.ID, nil), ErrNilMigrations)
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_TenantNotFound() {
+	err := s.repo.RollOut(s.ctx, uuid.New(), s.tenantMigrations())
+	s.ErrorIs(err, ErrTenantNotFound)
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_NilUUID() {
+	err := s.repo.RollOut(s.ctx, uuid.Nil, s.tenantMigrations())
+	s.ErrorIs(err, ErrTenantNotFound)
+}
+
+func (s *TenantRepoTestSuite) TestRollDown_TenantNotFound() {
+	err := s.repo.RollDown(s.ctx, uuid.New(), s.tenantMigrations())
+	s.ErrorIs(err, ErrTenantNotFound)
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_SchemaMissing() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-no-schema", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+	_, err = s.pool.Exec(s.ctx, fmt.Sprintf("DROP SCHEMA %q CASCADE", TenantSchema(created.ID)))
+	s.Require().NoError(err)
+
+	s.ErrorIs(s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()), ErrTenantSchemaNotFound)
+	s.ErrorIs(s.repo.RollDown(s.ctx, created.ID, s.tenantMigrations()), ErrTenantSchemaNotFound)
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_DisabledTenantIsMigrated() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-disabled", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+	s.Require().NoError(s.repo.SoftDelete(s.ctx, created.ID))
+
+	s.Require().NoError(s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()))
+	s.True(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "orders"))
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_UnsupportedDSN() {
+	cfg, err := pgxpool.ParseConfig("host=localhost user=postgres dbname=pgqs_test")
+	s.Require().NoError(err)
+	kvPool, err := pgxpool.NewWithConfig(s.ctx, cfg)
+	s.Require().NoError(err)
+	defer kvPool.Close()
+
+	repo := NewRepo(kvPool)
+	s.ErrorIs(repo.RollOut(s.ctx, uuid.New(), s.tenantMigrations()), ErrUnsupportedDSN)
+	s.ErrorIs(repo.RollDown(s.ctx, uuid.New(), s.tenantMigrations()), ErrUnsupportedDSN)
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_FailingMigrationReturnsError() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-bad-sql", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+
+	migrations := fstest.MapFS{
+		"000001_bad.up.sql":   {Data: []byte("CREATE TABLE broken (")},
+		"000001_bad.down.sql": {Data: []byte("SELECT 1;")},
+	}
+
+	err = s.repo.RollOut(s.ctx, created.ID, migrations)
+	s.Require().Error(err)
+	s.False(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "broken"))
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_CancelledContext() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-canceled", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+
+	ctx, cancel := context.WithCancel(s.ctx)
+	cancel()
+
+	s.ErrorIs(s.repo.RollOut(ctx, created.ID, s.tenantMigrations()), context.Canceled)
+	s.False(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "orders"))
+}
+
+func (s *TenantRepoTestSuite) TestRollOut_Concurrent() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rollout-concurrent", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+
+	const workers = 5
+	errs := make(chan error, workers)
+	for range workers {
+		go func() { errs <- s.repo.RollOut(s.ctx, created.ID, s.tenantMigrations()) }()
+	}
+
+	for range workers {
+		s.NoError(<-errs)
+	}
+	s.True(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "order_items"))
+}
+
+func (s *TenantRepoTestSuite) TestRollDown_AfterPartialRollOut() {
+	created, err := s.repo.Create(s.ctx, &Tenant{Name: "rolldown-partial", Metadata: []byte(`{}`)})
+	s.Require().NoError(err)
+
+	first := fstest.MapFS{
+		"000001_create_orders.up.sql":   {Data: []byte("CREATE TABLE orders (id INT PRIMARY KEY);")},
+		"000001_create_orders.down.sql": {Data: []byte("DROP TABLE orders;")},
+	}
+	s.Require().NoError(s.repo.RollOut(s.ctx, created.ID, first))
+
+	// the full set has a pending 000002, but only 000001 was ever applied
+	s.Require().NoError(s.repo.RollDown(s.ctx, created.ID, s.tenantMigrations()))
+	s.False(tableExists(s.T(), s.ctx, s.pool, TenantSchema(created.ID), "orders"))
 }
 
 func (s *TenantRepoTestSuite) TestRollOut_PanickingMigrationsReturnedAsError() {
@@ -541,7 +633,7 @@ func (s *TenantRepoTestSuite) TestRollOut_PanickingMigrationsReturnedAsError() {
 	s.Require().NoError(err)
 
 	s.NotPanics(func() {
-		err = s.repo.RollOut(s.ctx, created, panickingFS{})
+		err = s.repo.RollOut(s.ctx, created.ID, panickingFS{})
 	})
 	s.ErrorIs(err, ErrMigrationPanic)
 	s.Contains(err.Error(), "boom")
@@ -552,7 +644,7 @@ func (s *TenantRepoTestSuite) TestRollDown_PanickingMigrationsReturnedAsError() 
 	s.Require().NoError(err)
 
 	s.NotPanics(func() {
-		err = s.repo.RollDown(s.ctx, created, panickingFS{})
+		err = s.repo.RollDown(s.ctx, created.ID, panickingFS{})
 	})
 	s.ErrorIs(err, ErrMigrationPanic)
 	s.Contains(err.Error(), "boom")

@@ -43,7 +43,7 @@ Key behaviors:
 - **`DeleteTenantSchema`** ("purge") — transactionally deletes the row then `DROP SCHEMA ... CASCADE`. The DELETE trigger fires the `purged` notification.
 - **`GetAll`** orders active tenants before disabled ones.
 - **`GetSchemaInfo`** — `Exists` from `information_schema.schemata`; `Migrated` is true when the schema has any table other than `schema_migrations`.
-- **`RollOut` / `RollDown`** take the caller's golang-migrate files as an `fs.FS` rooted at the `.sql` files (use `fs.Sub` for an `embed.FS`) and run them via harness `mgr.Up`/`mgr.Down` with `TargetSchema` = tenant schema (`search_path`), using the pool's `ConnString()`. `ErrNoChange` is swallowed. Each tenant schema gets its own `schema_migrations`.
+- **`RollOut` / `RollDown`** take a tenant `uuid.UUID` and the caller's golang-migrate files as an `fs.FS` rooted at the `.sql` files (use `fs.Sub` for an `embed.FS`). They verify the tenant row and schema exist (`ErrTenantNotFound` / `ErrTenantSchemaNotFound`; disabled tenants are allowed), then run harness `mgr.Up`/`mgr.Down` with `TargetSchema` = tenant schema (`search_path`). The pool's `ConnString()` must be a `postgres(ql)://` URL, else `ErrUnsupportedDSN`. `ErrNoChange` is swallowed; panics become `ErrMigrationPanic`. Each tenant schema gets its own `schema_migrations`.
 
 ## Conventions
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 	"time"
 
 	"github.com/barnowlsnest/pgqs-harness/v2/mgr"
@@ -20,9 +21,12 @@ import (
 )
 
 var (
-	ErrNilTenant      = errors.New("nil tenant")
-	ErrNilMigrations  = errors.New("nil migrations")
-	ErrMigrationPanic = errors.New("tenant migration panicked")
+	ErrNilTenant            = errors.New("nil tenant")
+	ErrNilMigrations        = errors.New("nil migrations")
+	ErrMigrationPanic       = errors.New("tenant migration panicked")
+	ErrTenantNotFound       = errors.New("tenant not found")
+	ErrTenantSchemaNotFound = errors.New("tenant schema not found")
+	ErrUnsupportedDSN       = errors.New("pool connection string must be a postgres:// or postgresql:// URL")
 )
 
 const (
@@ -305,74 +309,99 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 	return nil
 }
 
+// migrationRunner applies a migration direction (mgr.Up or mgr.Down) for a configured tenant schema.
+type migrationRunner func(context.Context, *mgr.Config) error
+
 // RollOut applies the caller's migrations to the tenant schema.
 // migrations must be rooted at the golang-migrate files (NNNNNN_name.up.sql / .down.sql);
 // for an embed.FS use fs.Sub to step into the migrations' directory.
 // Unqualified names resolve to the tenant schema, which also holds its own schema_migrations table.
-func (tr *TenantRepo) RollOut(ctx context.Context, tenant *Tenant, migrations fs.FS) (err error) {
-	// a broken caller fs.FS or golang-migrate must never crash the host service
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%w: %v", ErrMigrationPanic, r)
-		}
-	}()
-
-	cfg, errCfg := tr.migrationConfig(tenant, migrations)
-	if errCfg != nil {
-		return errCfg
-	}
-
-	if errUp := mgr.Up(ctx, cfg); errUp != nil && !errors.Is(errUp, migrate.ErrNoChange) {
-		return errUp
-	}
-
-	return nil
+// Returns ErrTenantNotFound or ErrTenantSchemaNotFound when there is nothing to migrate into.
+func (tr *TenantRepo) RollOut(ctx context.Context, tenantID uuid.UUID, migrations fs.FS) error {
+	return tr.runMigrations(ctx, tenantID, migrations, mgr.Up)
 }
 
-// RollDown rolls back all of the caller's migrations in the tenant schema.
+// RollDown rolls back all the caller's migrations in the tenant schema, dropping the data they created.
 // migrations follow the same layout as in RollOut.
-func (tr *TenantRepo) RollDown(ctx context.Context, tenant *Tenant, migrations fs.FS) (err error) {
+func (tr *TenantRepo) RollDown(ctx context.Context, tenantID uuid.UUID, migrations fs.FS) error {
+	return tr.runMigrations(ctx, tenantID, migrations, mgr.Down)
+}
+
+func (tr *TenantRepo) runMigrations(
+	ctx context.Context,
+	tenantID uuid.UUID,
+	migrations fs.FS,
+	run migrationRunner,
+) (err error) {
 	// a broken caller fs.FS or golang-migrate must never crash the host service
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%w: %v", ErrMigrationPanic, r)
 		}
 	}()
-
-	cfg, errCfg := tr.migrationConfig(tenant, migrations)
-	if errCfg != nil {
-		return errCfg
-	}
-
-	if errDown := mgr.Down(ctx, cfg); errDown != nil && !errors.Is(errDown, migrate.ErrNoChange) {
-		return errDown
-	}
-
-	return nil
-}
-
-func (tr *TenantRepo) migrationConfig(tenant *Tenant, migrations fs.FS) (*mgr.Config, error) {
-	if tenant == nil {
-		return nil, ErrNilTenant
-	}
 
 	if migrations == nil {
-		return nil, ErrNilMigrations
+		return ErrNilMigrations
+	}
+
+	dbURL, errURL := tr.migrationBURL()
+	if errURL != nil {
+		return errURL
+	}
+
+	if errTenant := tr.ensureTenantSchema(ctx, tenantID); errTenant != nil {
+		return errTenant
 	}
 
 	src, errSrc := iofs.New(migrations, ".")
 	if errSrc != nil {
-		return nil, errSrc
+		return errSrc
 	}
 
-	schemaName := TenantSchema(tenant.ID)
-	log.Debug("TenantRepo.migrationConfig", log.F("schema", schemaName))
+	defer func() { _ = src.Close() }()
 
-	return &mgr.Config{
-		DBURL:        tr.pool.Config().ConnString(),
-		TargetSchema: schemaName,
-		EmbeddedSRC:  src,
-	}, nil
+	schemaName := TenantSchema(tenantID)
+	log.Debug("TenantRepo.runMigrations", log.F("schema", schemaName))
+
+	cfg := &mgr.Config{DBURL: dbURL, TargetSchema: schemaName, EmbeddedSRC: src}
+	if errRun := run(ctx, cfg); errRun != nil && !errors.Is(errRun, migrate.ErrNoChange) {
+		return errRun
+	}
+
+	return nil
+}
+
+// migrationBURL returns the pool's connection string, which golang-migrate needs as a URL.
+// pgx keeps the string the pool was created from, so keyword/value DSNs and pools
+// built without ParseConfig cannot be turned into one.
+func (tr *TenantRepo) migrationBURL() (string, error) {
+	connString := tr.pool.Config().ConnString()
+	if !strings.HasPrefix(connString, "postgres://") && !strings.HasPrefix(connString, "postgresql://") {
+		return "", ErrUnsupportedDSN
+	}
+
+	return connString, nil
+}
+
+func (tr *TenantRepo) ensureTenantSchema(ctx context.Context, tenantID uuid.UUID) error {
+	if _, errGet := tr.Get(ctx, tenantID); errGet != nil {
+		if pgxscan.NotFound(errGet) {
+			return fmt.Errorf("%w: %s", ErrTenantNotFound, tenantID)
+		}
+
+		return errGet
+	}
+
+	info, errInfo := tr.GetSchemaInfo(ctx, tenantID)
+	if errInfo != nil {
+		return errInfo
+	}
+
+	if !info.Exists {
+		return fmt.Errorf("%w: %s", ErrTenantSchemaNotFound, tenantID)
+	}
+
+	return nil
 }
 
 func (tr *TenantRepo) createTenantSchemaWithTX(ctx context.Context, tenantID uuid.UUID, tx pgx.Tx) error {

@@ -166,11 +166,19 @@ var embedded embed.FS
 
 migrations, err := fs.Sub(embedded, "migrations")
 
-err = repo.RollOut(ctx, tenant, migrations)  // apply pending migrations
-err = repo.RollDown(ctx, tenant, migrations) // roll back all of them
+err = repo.RollOut(ctx, tenantID, migrations)  // apply pending migrations
+err = repo.RollDown(ctx, tenantID, migrations) // roll back all of them (destructive)
 ```
 
 Write SQL without a schema prefix (`CREATE TABLE orders (...)`): migrations run with `search_path` set to the tenant schema, so tables, indexes and the tenant's own `schema_migrations` table land there. Each tenant tracks its version independently, and re-running `RollOut` is a no-op when nothing is pending. For SQL built in code, any `fs.FS` works, e.g. `fstest.MapFS{"000001_init.up.sql": {Data: []byte("CREATE TABLE ...")}}`. Function bodies resolve names when they are called, so give tenant functions `SET search_path` or qualify names there. `GetSchemaInfo` reports whether a tenant schema has been migrated.
+
+Things to know:
+
+- `RollDown` runs every `.down.sql` and drops the data those migrations created. It cannot be undone.
+- Migrations see only the tenant schema in `search_path`, so objects from `public` (extensions, types, functions) must be schema-qualified.
+- Both calls return `ErrTenantNotFound` / `ErrTenantSchemaNotFound` when the tenant row or its schema is missing. Disabled tenants can still be migrated.
+- The pool must have been created from a `postgres://` or `postgresql://` URL (`pgxpool.New` / `ParseConfig`). Keyword/value DSNs and hand-built configs return `ErrUnsupportedDSN`.
+- Panics from a broken `fs.FS` come back as `ErrMigrationPanic`.
 
 ### LISTEN/NOTIFY events
 
