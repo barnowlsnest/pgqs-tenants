@@ -19,7 +19,7 @@ go test -v -race ./pkg/pgtenant -run TestTenantRepoTestSuite/TestCreate_Success
 
 Tests use testcontainers-go and **require a running Docker daemon**. Requires Go 1.27+ and PostgreSQL 14+.
 
-CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.13. Both take the Go version from `go.mod`.
+CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.14. Both take the Go version from `go.mod`.
 
 ## Architecture
 
