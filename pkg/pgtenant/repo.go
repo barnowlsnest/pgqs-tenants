@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"strings"
 	"time"
 
+	"github.com/barnowlsnest/pgqs-harness/v2/mgr"
 	"github.com/barnowlsnest/pgqs-harness/v2/postgres"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -16,7 +21,12 @@ import (
 )
 
 var (
-	ErrNilTenant = errors.New("nil tenant")
+	ErrNilTenant            = errors.New("nil tenant")
+	ErrNilMigrations        = errors.New("nil migrations")
+	ErrMigrationPanic       = errors.New("tenant migration panicked")
+	ErrTenantNotFound       = errors.New("tenant not found")
+	ErrTenantSchemaNotFound = errors.New("tenant schema not found")
+	ErrUnsupportedDSN       = errors.New("pool connection string must be a postgres:// or postgresql:// URL")
 )
 
 const (
@@ -294,6 +304,101 @@ func (tr *TenantRepo) DeleteTenantSchema(ctx context.Context, tenantID uuid.UUID
 
 	if errCommit := tx.Commit(ctx); errCommit != nil {
 		return errCommit
+	}
+
+	return nil
+}
+
+// migrationRunner applies a migration direction (mgr.Up or mgr.Down) for a configured tenant schema.
+type migrationRunner func(context.Context, *mgr.Config) error
+
+// RollOut applies the caller's migrations to the tenant schema.
+// migrations must be rooted at the golang-migrate files (NNNNNN_name.up.sql / .down.sql);
+// for an embed.FS use fs.Sub to step into the migrations' directory.
+// Unqualified names resolve to the tenant schema, which also holds its own schema_migrations table.
+// Returns ErrTenantNotFound or ErrTenantSchemaNotFound when there is nothing to migrate into.
+func (tr *TenantRepo) RollOut(ctx context.Context, tenantID uuid.UUID, migrations fs.FS) error {
+	return tr.runMigrations(ctx, tenantID, migrations, mgr.Up)
+}
+
+// RollDown rolls back all the caller's migrations in the tenant schema, dropping the data they created.
+// migrations follow the same layout as in RollOut.
+func (tr *TenantRepo) RollDown(ctx context.Context, tenantID uuid.UUID, migrations fs.FS) error {
+	return tr.runMigrations(ctx, tenantID, migrations, mgr.Down)
+}
+
+func (tr *TenantRepo) runMigrations(
+	ctx context.Context,
+	tenantID uuid.UUID,
+	migrations fs.FS,
+	run migrationRunner,
+) (err error) {
+	// a broken caller fs.FS or golang-migrate must never crash the host service
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %v", ErrMigrationPanic, r)
+		}
+	}()
+
+	if migrations == nil {
+		return ErrNilMigrations
+	}
+
+	dbURL, errURL := tr.migrationBURL()
+	if errURL != nil {
+		return errURL
+	}
+
+	if errTenant := tr.ensureTenantSchema(ctx, tenantID); errTenant != nil {
+		return errTenant
+	}
+
+	src, errSrc := iofs.New(migrations, ".")
+	if errSrc != nil {
+		return errSrc
+	}
+
+	defer func() { _ = src.Close() }()
+
+	schemaName := TenantSchema(tenantID)
+	log.Debug("TenantRepo.runMigrations", log.F("schema", schemaName))
+
+	cfg := &mgr.Config{DBURL: dbURL, TargetSchema: schemaName, EmbeddedSRC: src}
+	if errRun := run(ctx, cfg); errRun != nil && !errors.Is(errRun, migrate.ErrNoChange) {
+		return errRun
+	}
+
+	return nil
+}
+
+// migrationBURL returns the pool's connection string, which golang-migrate needs as a URL.
+// pgx keeps the string the pool was created from, so keyword/value DSNs and pools
+// built without ParseConfig cannot be turned into one.
+func (tr *TenantRepo) migrationBURL() (string, error) {
+	connString := tr.pool.Config().ConnString()
+	if !strings.HasPrefix(connString, "postgres://") && !strings.HasPrefix(connString, "postgresql://") {
+		return "", ErrUnsupportedDSN
+	}
+
+	return connString, nil
+}
+
+func (tr *TenantRepo) ensureTenantSchema(ctx context.Context, tenantID uuid.UUID) error {
+	if _, errGet := tr.Get(ctx, tenantID); errGet != nil {
+		if pgxscan.NotFound(errGet) {
+			return fmt.Errorf("%w: %s", ErrTenantNotFound, tenantID)
+		}
+
+		return errGet
+	}
+
+	info, errInfo := tr.GetSchemaInfo(ctx, tenantID)
+	if errInfo != nil {
+		return errInfo
+	}
+
+	if !info.Exists {
+		return fmt.Errorf("%w: %s", ErrTenantSchemaNotFound, tenantID)
 	}
 
 	return nil

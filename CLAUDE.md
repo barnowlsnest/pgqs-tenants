@@ -19,7 +19,7 @@ go test -v -race ./pkg/pgtenant -run TestTenantRepoTestSuite/TestCreate_Success
 
 Tests use testcontainers-go and **require a running Docker daemon**. Requires Go 1.27+ and PostgreSQL 14+.
 
-CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.13. Both take the Go version from `go.mod`.
+CI (`.github/workflows/`): `build.yml` runs `task build` + `task test`; `lint.yml` runs golangci-lint v2.14. Both take the Go version from `go.mod`.
 
 ## Architecture
 
@@ -43,8 +43,7 @@ Key behaviors:
 - **`DeleteTenantSchema`** ("purge") — transactionally deletes the row then `DROP SCHEMA ... CASCADE`. The DELETE trigger fires the `purged` notification.
 - **`GetAll`** orders active tenants before disabled ones.
 - **`GetSchemaInfo`** — `Exists` from `information_schema.schemata`; `Migrated` is true when the schema has any table other than `schema_migrations`.
-
-The `pgtenant` package does not run per-tenant migrations — it only creates the empty schema. Applying tenant-scoped migrations into that schema is the caller's responsibility.
+- **`RollOut` / `RollDown`** take a tenant `uuid.UUID` and the caller's golang-migrate files as an `fs.FS` rooted at the `.sql` files (use `fs.Sub` for an `embed.FS`). They verify the tenant row and schema exist (`ErrTenantNotFound` / `ErrTenantSchemaNotFound`; disabled tenants are allowed), then run harness `mgr.Up`/`mgr.Down` with `TargetSchema` = tenant schema (`search_path`). The pool's `ConnString()` must be a `postgres(ql)://` URL, else `ErrUnsupportedDSN`. `ErrNoChange` is swallowed; panics become `ErrMigrationPanic`. Each tenant schema gets its own `schema_migrations`.
 
 ## Conventions
 
