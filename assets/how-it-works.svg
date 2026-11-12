@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 450" width="980" height="450" role="img" aria-label="pgqs-tenants lifecycle: Create, RollOut, Update, SoftDelete, DeleteTenantSchema">
+  <title>How pgqs-tenants works</title>
+  <style>
+    .bg{fill:#f6f8fa}.panel{fill:#fff;stroke:#d0d7de}.box{fill:#f6f8fa;stroke:#d0d7de}
+    .t{fill:#1f2328}.m{fill:#656d76}.a{fill:#0969da}.g{fill:#1a7f37}.r{fill:#cf222e}.x{fill:#6e7781}.p{fill:#8250df}
+    .hl{fill:#0969da;fill-opacity:.1;stroke:#0969da;stroke-opacity:.5}
+    .pill{fill:#fff;stroke:#d0d7de}.tbl{fill:#ddf4ff;stroke:#54aeff}.line{stroke:#d0d7de}
+    .kb{fill:#fff8c5;stroke:#d4a72c}.k{fill:#7d4e00;font-weight:600}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#0d1117}.panel{fill:#161b22;stroke:#30363d}.box{fill:#0d1117;stroke:#30363d}
+      .t{fill:#e6edf3}.m{fill:#8d96a0}.a{fill:#4493f8}.g{fill:#3fb950}.r{fill:#f85149}.x{fill:#8d96a0}.p{fill:#a371f7}
+      .hl{fill:#4493f8;stroke:#4493f8}.pill{fill:#161b22;stroke:#30363d}.tbl{fill:#0c2d6b;stroke:#1f6feb}.line{stroke:#30363d}
+      .kb{fill:#272115;stroke:#bb8009}.k{fill:#e3b341}
+    }
+    text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+    .h{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:14px;font-weight:600}
+    .cap{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:13px}
+    .s{font-size:11px}
+    *{animation-duration:20s;animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+
+    .hlr{animation-name:hl}
+    @keyframes hl{0%,19%{transform:translateY(0)}20%,39%{transform:translateY(50px)}40%,59%{transform:translateY(100px)}60%,79%{transform:translateY(150px)}80%,99%{transform:translateY(200px)}100%{transform:translateY(0)}}
+
+    .pk1{animation-name:pk1}.pk2{animation-name:pk2}.pk3{animation-name:pk3}.pk4{animation-name:pk4}.pk5{animation-name:pk5}
+    @keyframes pk1{0%,1%{opacity:0;transform:translate(0,0)}1.5%{opacity:1}5%{opacity:1;transform:translate(66px,58px)}5.5%,100%{opacity:0;transform:translate(66px,58px)}}
+    @keyframes pk2{0%,21%{opacity:0;transform:translate(0,0)}21.5%{opacity:1}25%{opacity:1;transform:translate(66px,104px)}25.5%,100%{opacity:0;transform:translate(66px,104px)}}
+    @keyframes pk3{0%,41%{opacity:0;transform:translate(0,0)}41.5%{opacity:1}45%{opacity:1;transform:translate(66px,-42px)}45.5%,100%{opacity:0;transform:translate(66px,-42px)}}
+    @keyframes pk4{0%,61%{opacity:0;transform:translate(0,0)}61.5%{opacity:1}65%{opacity:1;transform:translate(66px,-92px)}65.5%,100%{opacity:0;transform:translate(66px,-92px)}}
+    @keyframes pk5{0%,81%{opacity:0;transform:translate(0,0)}81.5%{opacity:1}85%{opacity:1;transform:translate(66px,-142px)}85.5%,100%{opacity:0;transform:translate(66px,-142px)}}
+
+    .nt1{animation-name:nt1}.nt2{animation-name:nt2}.nt3{animation-name:nt3}.nt4{animation-name:nt4}
+    @keyframes nt1{0%,8%{opacity:0;transform:translate(0,0)}8.5%{opacity:1}12%{opacity:1;transform:translate(70px,-67px)}12.5%,100%{opacity:0;transform:translate(70px,-67px)}}
+    @keyframes nt2{0%,47%{opacity:0;transform:translate(0,0)}47.5%{opacity:1}51%{opacity:1;transform:translate(70px,-11px)}51.5%,100%{opacity:0;transform:translate(70px,-11px)}}
+    @keyframes nt3{0%,67%{opacity:0;transform:translate(0,0)}67.5%{opacity:1}71%{opacity:1;transform:translate(70px,45px)}71.5%,100%{opacity:0;transform:translate(70px,45px)}}
+    @keyframes nt4{0%,88%{opacity:0;transform:translate(0,0)}88.5%{opacity:1}92%{opacity:1;transform:translate(70px,101px)}92.5%,100%{opacity:0;transform:translate(70px,101px)}}
+
+    .row{animation-name:row}
+    @keyframes row{0%,5%{opacity:0}6%,65%{opacity:1}66%,85%{opacity:.6}87%,100%{opacity:0}}
+    .st1{animation-name:st1}.st2{animation-name:st2}.st3{animation-name:st3}
+    @keyframes st1{0%,45%{opacity:1}46%,100%{opacity:0}}
+    @keyframes st2{0%,45%{opacity:0}46%,65%{opacity:1}66%,100%{opacity:0}}
+    @keyframes st3{0%,65%{opacity:0}66%,100%{opacity:1}}
+
+    .sch{animation-name:sch}
+    @keyframes sch{0%,6%{opacity:0}8%,65%{opacity:1}67%,85%{opacity:.55}89%,100%{opacity:0}}
+    .empty{animation-name:empty}
+    @keyframes empty{0%,24%{opacity:1}25%,100%{opacity:0}}
+    .tb1{animation-name:tb1}.tb2{animation-name:tb2}.tb3{animation-name:tb3}
+    @keyframes tb1{0%,25%{opacity:0}26%,100%{opacity:1}}
+    @keyframes tb2{0%,27%{opacity:0}28%,100%{opacity:1}}
+    @keyframes tb3{0%,29%{opacity:0}30%,100%{opacity:1}}
+    .kept{animation-name:kept}
+    @keyframes kept{0%,66%{opacity:0}67%,84%{opacity:1}85%,100%{opacity:0}}
+
+    .ev1{animation-name:ev1}.ev2{animation-name:ev2}.ev3{animation-name:ev3}.ev4{animation-name:ev4}
+    @keyframes ev1{0%,12%{opacity:0}13%,96%{opacity:1}99%,100%{opacity:0}}
+    @keyframes ev2{0%,51%{opacity:0}52%,96%{opacity:1}99%,100%{opacity:0}}
+    @keyframes ev3{0%,71%{opacity:0}72%,96%{opacity:1}99%,100%{opacity:0}}
+    @keyframes ev4{0%,92%{opacity:0}93%,96%{opacity:1}99%,100%{opacity:0}}
+
+    .c1{animation-name:c1}.c2{animation-name:c2}.c3{animation-name:c3}.c4{animation-name:c4}.c5{animation-name:c5}
+    @keyframes c1{0%,19%{opacity:1}20%,99%{opacity:0}100%{opacity:1}}
+    @keyframes c2{0%,19%{opacity:0}20%,39%{opacity:1}40%,100%{opacity:0}}
+    @keyframes c3{0%,39%{opacity:0}40%,59%{opacity:1}60%,100%{opacity:0}}
+    @keyframes c4{0%,59%{opacity:0}60%,79%{opacity:1}80%,100%{opacity:0}}
+    @keyframes c5{0%,79%{opacity:0}80%,99%{opacity:1}100%{opacity:0}}
+  </style>
+
+  <rect class="bg" width="980" height="450" rx="12"/>
+
+  <!-- Go service -->
+  <rect class="panel" x="24" y="60" width="280" height="340" rx="10"/>
+  <text class="h t" x="40" y="86">your Go service</text>
+  <text class="s m" x="40" y="106">repo := pgtenant.NewRepo(pool)</text>
+  <rect class="hl hlr" x="34" y="120" width="260" height="40" rx="6"/>
+  <text class="t" x="44" y="137">repo.<tspan class="a">Create</tspan>(ctx, "acme")</text>
+  <text class="s m" x="44" y="153">// row + schema, one tx</text>
+  <text class="t" x="44" y="187">repo.<tspan class="a">RollOut</tspan>(ctx, id, fsys)</text>
+  <text class="s m" x="44" y="203">// your DDL, no event</text>
+  <text class="t" x="44" y="237">repo.<tspan class="a">Update</tspan>(ctx, id, ready)</text>
+  <text class="s m" x="44" y="253">// status → ready</text>
+  <text class="t" x="44" y="287">repo.<tspan class="a">SoftDelete</tspan>(ctx, id)</text>
+  <text class="s m" x="44" y="303">// status → disabled</text>
+  <text class="t" x="44" y="337">repo.<tspan class="a">DeleteTenantSchema</tspan>(ctx, id)</text>
+  <text class="s m" x="44" y="353">// purge: DROP SCHEMA CASCADE</text>
+
+  <!-- packets app → db -->
+  <circle class="a pk1" cx="292" cy="136" r="5"/>
+  <circle class="a pk2" cx="292" cy="186" r="5"/>
+  <circle class="a pk3" cx="292" cy="236" r="5"/>
+  <circle class="a pk4" cx="292" cy="286" r="5"/>
+  <circle class="a pk5" cx="292" cy="336" r="5"/>
+
+  <!-- PostgreSQL -->
+  <rect class="panel" x="344" y="60" width="380" height="340" rx="10"/>
+  <text class="h t" x="360" y="86">PostgreSQL</text>
+
+  <rect class="box" x="358" y="100" width="352" height="112" rx="8"/>
+  <text class="s m" x="372" y="120">schema pgqs · table tenants</text>
+  <text class="s m" x="372" y="144">name</text>
+  <text class="s m" x="452" y="144">status</text>
+  <text class="s m" x="552" y="144">schema_name</text>
+  <line class="line" x1="372" y1="152" x2="696" y2="152"/>
+  <text class="t" x="372" y="172">globex</text>
+  <text class="g" x="452" y="172">ready</text>
+  <text class="m" x="552" y="172">pgqs_tenant_3b9d…</text>
+  <g class="row">
+    <text class="t" x="372" y="196">acme</text>
+    <text class="a st1" x="452" y="196">created</text>
+    <text class="g st2" x="452" y="196">ready</text>
+    <text class="x st3" x="452" y="196">disabled</text>
+    <text class="m" x="552" y="196">pgqs_tenant_7c1e…</text>
+  </g>
+
+  <g class="sch">
+    <rect class="box" x="358" y="230" width="352" height="156" rx="8" stroke-dasharray="5 4"/>
+    <text class="s m" x="372" y="252">schema pgqs_tenant_7c1e…</text>
+    <text class="s m empty" x="372" y="296">(empty)</text>
+    <g class="tb1"><rect class="tbl" x="372" y="272" width="168" height="28" rx="6"/><text class="t" x="384" y="290">schema_migrations</text></g>
+    <g class="tb2"><rect class="tbl" x="372" y="312" width="150" height="28" rx="6"/><text class="t" x="384" y="330">orders</text></g>
+    <g class="tb3"><rect class="tbl" x="534" y="312" width="150" height="28" rx="6"/><text class="t" x="546" y="330">customers</text></g>
+  </g>
+
+  <g class="kept"><rect class="kb" x="580" y="238" width="118" height="22" rx="11"/><text class="s k" x="592" y="253">kept, disabled</text></g>
+
+  <!-- NOTIFY db → listener -->
+  <circle class="p nt1" cx="712" cy="192" r="5"/>
+  <circle class="p nt2" cx="712" cy="192" r="5"/>
+  <circle class="p nt3" cx="712" cy="192" r="5"/>
+  <circle class="p nt4" cx="712" cy="192" r="5"/>
+
+  <!-- listener -->
+  <rect class="panel" x="764" y="60" width="192" height="340" rx="10"/>
+  <text class="h t" x="780" y="86">LISTEN tenants</text>
+  <g class="ev1"><rect class="pill" x="778" y="102" width="164" height="46" rx="8"/><text class="a" x="790" y="121">"event":"created"</text><text class="s m" x="790" y="138">pgqs_tenant_7c1e…</text></g>
+  <g class="ev2"><rect class="pill" x="778" y="158" width="164" height="46" rx="8"/><text class="g" x="790" y="177">"event":"ready"</text><text class="s m" x="790" y="194">pgqs_tenant_7c1e…</text></g>
+  <g class="ev3"><rect class="pill" x="778" y="214" width="164" height="46" rx="8"/><text class="x" x="790" y="233">"event":"disabled"</text><text class="s m" x="790" y="250">pgqs_tenant_7c1e…</text></g>
+  <g class="ev4"><rect class="pill" x="778" y="270" width="164" height="46" rx="8"/><text class="r" x="790" y="289">"event":"purged"</text><text class="s m" x="790" y="306">pgqs_tenant_7c1e…</text></g>
+  <text class="s m" x="780" y="384">pg_notify via triggers</text>
+
+  <text class="h t" x="24" y="38">pgqs-tenants · schema-per-tenant lifecycle</text>
+
+  <!-- captions -->
+  <text class="cap t c1" x="490" y="430" text-anchor="middle">Create — inserts the tenant row and CREATE SCHEMA in one transaction, then NOTIFY "created"</text>
+  <text class="cap t c2" x="490" y="430" text-anchor="middle">RollOut — runs your golang-migrate files inside the tenant schema; no event is sent</text>
+  <text class="cap t c3" x="490" y="430" text-anchor="middle">Update — setting status to "ready" after RollOut tells listeners the tenant is migrated</text>
+  <text class="cap t c4" x="490" y="430" text-anchor="middle">SoftDelete — status becomes "disabled"; the schema and its data are kept</text>
+  <text class="cap t c5" x="490" y="430" text-anchor="middle">DeleteTenantSchema — deletes the row and drops the schema, then NOTIFY "purged"</text>
+</svg>
