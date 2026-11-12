@@ -40,6 +40,14 @@ go get github.com/barnowlsnest/pgqs-tenants/v3
 | `pkg/pgtenant` | `TenantRepo` — CRUD, schema management and tenant migrations  |
 | `pkg/database` | `RollOut` / `RollDown` — applies embedded database migrations |
 
+## Built on
+
+| Dependency                                                               | Used for                                                              |
+|--------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| [pgqs-harness](https://github.com/barnowlsnest/pgqs-harness)             | Postgres pool (`postgres.DBPool`), SQL builder, migration runner      |
+| [go-logslib](https://github.com/barnowlsnest/go-logslib)                 | Structured logging (`sharedlog`)                                      |
+| [golang-migrate](https://github.com/golang-migrate/migrate)              | Migration format and engine for control-plane and per-tenant rollouts |
+
 ## Overview
 
 Each tenant gets its own PostgreSQL schema (`pgqs_tenant_<uuid>`), created automatically on tenant creation. The `pgqs` controller schema holds the shared `tenants` table. Triggers fire `pg_notify` on the `tenants` channel whenever a tenant is inserted, changes status, or is deleted, enabling event-driven consumers to react to lifecycle changes.
