@@ -3,11 +3,14 @@
 [![Build](https://github.com/barnowlsnest/pgqs-tenants/actions/workflows/build.yml/badge.svg)](https://github.com/barnowlsnest/pgqs-tenants/actions/workflows/build.yml)
 [![Lint](https://github.com/barnowlsnest/pgqs-tenants/actions/workflows/lint.yml/badge.svg)](https://github.com/barnowlsnest/pgqs-tenants/actions/workflows/lint.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/pgqs-tenants/v3.svg)](https://pkg.go.dev/github.com/barnowlsnest/pgqs-tenants/v3)
-[![Go Report Card](https://goreportcard.com/badge/github.com/barnowlsnest/pgqs-tenants/v3)](https://goreportcard.com/report/github.com/barnowlsnest/pgqs-tenants/v3)
 [![Release](https://img.shields.io/github/v/release/barnowlsnest/pgqs-tenants)](https://github.com/barnowlsnest/pgqs-tenants/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Go library for schema-per-tenant PostgreSQL multi-tenancy, built for the [pgqs](https://github.com/barnowlsnest) ecosystem but usable on its own. It provides tenant lifecycle management — create, update, soft-delete and purge — backed by schema isolation and `LISTEN/NOTIFY` change events.
+
+<p align="center">
+  <img src="assets/how-it-works.svg" alt="How pgqs-tenants works: Create, RollOut, Update, SoftDelete and DeleteTenantSchema with LISTEN/NOTIFY events" width="100%">
+</p>
 
 ## Features
 
